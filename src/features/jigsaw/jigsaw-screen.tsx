@@ -1,0 +1,651 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  contentApi,
+  errorMessage,
+  mediaApi,
+  type ApiCategory,
+  type ApiCategoryKey,
+  type ApiJigsawItem,
+  type JigsawItemInput,
+} from '@/shared/api';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Field,
+  Input,
+  Loading,
+  Select,
+  Textarea,
+} from '@/shared/components/ui';
+import { fallbackJigsawImage } from '@/shared/assets/images';
+import { useAsync } from '@/shared/lib/use-async';
+import { categoryColor, categoryMeta } from '@/shared/theme/colors';
+import JigsawCropper from './jigsaw-cropper';
+import JigsawPreview, { PIECE_COUNTS } from './jigsaw-preview';
+
+/**
+ * Jigsaw content, one picture per activity.
+ *
+ * A category has 30 jigsaw activities (5 levels × 6). Each one is assigned its
+ * picture here, by hand — the grid is the screen, because "which picture does
+ * Level 3 Activity 4 play" is the only question this page exists to answer, and
+ * it should be answerable at a glance rather than by clicking through levels.
+ *
+ * Uploading and assigning are separate steps underneath: pictures belong to the
+ * category, and a slot points at one. That is invisible in the common case
+ * (choose a slot, upload, done) but means the same picture can be reused across
+ * several activities without uploading it twice.
+ *
+ * An unassigned activity is not broken — it falls back to the category picture,
+ * and below that to the image the game ships with. Assign the activities that
+ * matter and leave the rest.
+ */
+
+const LEVELS = [1, 2, 3, 4, 5];
+const ACTIVITIES = [1, 2, 3, 4, 5, 6];
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+const slotKey = (level: number, activityNum: number) => `${level}_${activityNum}`;
+
+/** The text an admin writes about a picture — the same fields whether adding or editing. */
+interface PictureDetails {
+  title: string;
+  definition_en: string | null;
+  definition_tl: string | null;
+  context_en: string | null;
+  context_tl: string | null;
+}
+
+const emptyDetails = (level: string, activityNum: string): PictureDetails => ({
+  title: `Level ${level} · Activity ${activityNum}`,
+  definition_en: null,
+  definition_tl: null,
+  context_en: null,
+  context_tl: null,
+});
+
+export default function JigsawScreen() {
+  const [selected, setSelected] = useState<ApiCategoryKey>('history');
+  const categories = useAsync(() => contentApi.categories(), []);
+  const category = categories.data?.find((c) => c.key === selected) ?? null;
+
+  return (
+    <>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div className="pill-tabs">
+          {categoryMeta.map((meta) => {
+            const assigned = Object.keys(
+              categories.data?.find((c) => c.key === meta.key)?.jigsawSlots ?? {},
+            ).length;
+            return (
+              <button
+                key={meta.key}
+                className={`pill-tab ${selected === meta.key ? 'pill-tab--active' : ''}`}
+                style={selected === meta.key ? { background: categoryColor(meta.key) } : undefined}
+                onClick={() => setSelected(meta.key)}
+              >
+                {meta.label}
+                {assigned > 0 && <span className="pill-tab__count">{assigned}/30</span>}
+              </button>
+            );
+          })}
+        </div>
+        <Button variant="secondary" small onClick={categories.reload}>
+          Refresh
+        </Button>
+      </div>
+
+      {categories.loading ? (
+        <Loading label="Loading jigsaw content…" />
+      ) : categories.error ? (
+        <Banner tone="error">{categories.error}</Banner>
+      ) : category ? (
+        <CategoryJigsaws key={category.key} category={category} onSaved={categories.reload} />
+      ) : null}
+    </>
+  );
+}
+
+/* ---------------------------------------------------------------- category */
+
+function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved: () => void }) {
+  const [items, setItems] = useState<ApiJigsawItem[]>(category.jigsaws);
+  const [slots, setSlots] = useState<Record<string, string>>(category.jigsawSlots);
+  const [openSlot, setOpenSlot] = useState<string | null>(null);
+  const [pending, setPending] = useState<File | null>(null);
+  const [pieceCount, setPieceCount] = useState(6);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setItems(category.jigsaws);
+    setSlots(category.jigsawSlots);
+    setOpenSlot(null);
+  }, [category]);
+
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const assignedCount = Object.keys(slots).length;
+
+  const openItem = openSlot ? (itemById.get(slots[openSlot] ?? '') ?? null) : null;
+
+  /** Every write sends the whole set, so assign/edit/clear share one path. */
+  const persist = async (
+    nextItems: JigsawItemInput[],
+    nextSlots: Record<string, string>,
+    message: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const saved = await contentApi.replaceJigsaws(category.key, nextItems, nextSlots);
+      setItems(saved.items);
+      setSlots(saved.slots);
+      setNotice(message);
+      onSaved();
+      return saved;
+    } catch (err) {
+      setError(errorMessage(err, 'The change could not be saved.'));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file (JPG, PNG or WebP).');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError('That image is larger than 5 MB. Choose a smaller one.');
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    setPending(file);
+  };
+
+  /**
+   * Uploads the cropped square and assigns it to the open activity, with the
+   * text the admin wrote alongside it.
+   *
+   * One save, not two: the id is minted here rather than server-side, so the
+   * picture and the slot pointing at it land in the same request. A half-done
+   * add — a picture nothing plays, or a slot pointing at nothing — is then not
+   * a state that can exist.
+   */
+  const createForSlot = async (square: File, details: PictureDetails) => {
+    if (!openSlot) return;
+    setPending(null);
+    if (fileInput.current) fileInput.current.value = '';
+
+    setBusy(true);
+    setError(null);
+    try {
+      const imageUrl = await mediaApi.upload(square, 'category-image', {
+        categoryKey: category.key,
+      });
+      const id = crypto.randomUUID();
+
+      await persist(
+        [...items, { id, imageUrl, ...details }],
+        { ...slots, [openSlot]: id },
+        'Picture and mini-lesson saved. Students see the lesson when they finish this puzzle.',
+      );
+    } catch (err) {
+      setError(errorMessage(err, 'The picture could not be uploaded.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assignExisting = (id: string) => {
+    if (!openSlot) return;
+    void persist(items, { ...slots, [openSlot]: id }, 'Picture assigned to this activity.');
+  };
+
+  const clearSlot = () => {
+    if (!openSlot) return;
+    const next = { ...slots };
+    delete next[openSlot];
+    void persist(items, next, 'Activity cleared — it falls back to the category picture.');
+  };
+
+  const saveItem = (patch: ApiJigsawItem) =>
+    persist(
+      items.map((item) => (item.id === patch.id ? patch : item)),
+      slots,
+      'Saved.',
+    );
+
+  return (
+    <>
+      {error && <Banner tone="error">{error}</Banner>}
+      {notice && !error && <Banner tone="success">{notice}</Banner>}
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(e) => pickFile(e.target.files?.[0])}
+      />
+
+      <Card
+        title={`${category.label} — jigsaw activities`}
+        hint={`${assignedCount} of 30 assigned. Click an activity to give it a picture; the rest fall back to the category picture.`}
+        actions={
+          <Select
+            value={pieceCount}
+            onChange={(e) => setPieceCount(Number(e.target.value))}
+            style={{ width: 180 }}
+          >
+            {PIECE_COUNTS.map((option) => (
+              <option key={option.count} value={option.count}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        }
+        bodyless
+      >
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Level</th>
+                {ACTIVITIES.map((num) => (
+                  <th key={num}>Activity {num}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {LEVELS.map((level) => (
+                <tr key={level}>
+                  <td className="table__primary">Level {level}</td>
+                  {ACTIVITIES.map((activityNum) => {
+                    const key = slotKey(level, activityNum);
+                    const item = itemById.get(slots[key] ?? '');
+                    return (
+                      <td key={activityNum}>
+                        <button
+                          className={`slot ${openSlot === key ? 'slot--active' : ''} ${
+                            item ? '' : 'slot--empty'
+                          }`}
+                          onClick={() => setOpenSlot(openSlot === key ? null : key)}
+                        >
+                          {item ? (
+                            <>
+                              <img src={item.imageUrl} alt="" className="slot__thumb" />
+                              <span className="slot__title">{item.title}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="slot__plus" aria-hidden>
+                                +
+                              </span>
+                              <span className="slot__title">Not set</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {openSlot && (
+        <SlotEditor
+          slot={openSlot}
+          item={openItem}
+          items={items}
+          pieceCount={pieceCount}
+          busy={busy}
+          pending={pending}
+          fallbackUrl={category.imageUrl ?? fallbackJigsawImage[category.key]}
+          onUploadClick={() => fileInput.current?.click()}
+          onClearPending={() => {
+            setPending(null);
+            if (fileInput.current) fileInput.current.value = '';
+          }}
+          onCreate={createForSlot}
+          onAssign={assignExisting}
+          onClear={clearSlot}
+          onSaveItem={saveItem}
+          onClose={() => setOpenSlot(null)}
+        />
+      )}
+
+      <CategoryFallback category={category} onSaved={onSaved} />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------- slot editor */
+
+function SlotEditor({
+  slot,
+  item,
+  items,
+  pieceCount,
+  busy,
+  pending,
+  fallbackUrl,
+  onUploadClick,
+  onClearPending,
+  onCreate,
+  onAssign,
+  onClear,
+  onSaveItem,
+  onClose,
+}: {
+  slot: string;
+  item: ApiJigsawItem | null;
+  items: ApiJigsawItem[];
+  pieceCount: number;
+  busy: boolean;
+  pending: File | null;
+  fallbackUrl: string;
+  onUploadClick: () => void;
+  /** Drops the picked file, whether the crop was confirmed or abandoned. */
+  onClearPending: () => void;
+  onCreate: (square: File, details: PictureDetails) => void;
+  onAssign: (id: string) => void;
+  onClear: () => void;
+  onSaveItem: (item: ApiJigsawItem) => Promise<unknown>;
+  onClose: () => void;
+}) {
+  const [level, activityNum] = slot.split('_');
+
+  /**
+   * The add flow is crop → write → save, so the cropped square is held here
+   * until the text is written. Writing the mini-lesson is part of adding the
+   * picture rather than a second visit to the same screen — the lesson is the
+   * point of the activity, and an upload flow that ends before it invites
+   * pictures with nothing to teach.
+   */
+  const [square, setSquare] = useState<File | null>(null);
+  const [draft, setDraft] = useState<PictureDetails>(emptyDetails(level, activityNum));
+  const [problem, setProblem] = useState<string | null>(null);
+
+  // Reopening on a different activity, or on one whose picture changed, starts
+  // the form from what is actually stored.
+  useEffect(() => {
+    setSquare(null);
+    setDraft(item ?? emptyDetails(level, activityNum));
+    setProblem(null);
+  }, [item, level, activityNum]);
+
+  const patch = (next: Partial<PictureDetails>) =>
+    setDraft((current) => ({ ...current, ...next }));
+
+  const save = () => {
+    if (!draft.title.trim()) {
+      setProblem('Give the picture a name — it is the caption a student sees.');
+      return;
+    }
+    setProblem(null);
+
+    const details: PictureDetails = {
+      title: draft.title.trim(),
+      definition_en: draft.definition_en?.trim() || null,
+      definition_tl: draft.definition_tl?.trim() || null,
+      context_en: draft.context_en?.trim() || null,
+      context_tl: draft.context_tl?.trim() || null,
+    };
+
+    if (square) onCreate(square, details);
+    else if (item) void onSaveItem({ ...item, ...details });
+  };
+
+  /** Pictures already uploaded to this category, minus the one already here. */
+  const reusable = items.filter((candidate) => candidate.id !== item?.id);
+
+  // Created once per cropped file and revoked when it is replaced or discarded —
+  // minting one in the render body would leak a URL on every keystroke in the
+  // form below.
+  const [squareUrl, setSquareUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!square) {
+      setSquareUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(square);
+    setSquareUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [square]);
+
+  const previewUrl = squareUrl ?? item?.imageUrl ?? fallbackUrl;
+
+  return (
+    <Card
+      title={`Level ${level} · Activity ${activityNum}`}
+      hint={
+        square
+          ? 'Write what this picture teaches, then save.'
+          : item
+            ? 'This activity plays the picture below.'
+            : 'No picture set for this activity yet.'
+      }
+      actions={
+        <>
+          {item && !square && (
+            <Button variant="secondary" small onClick={onClear} disabled={busy}>
+              Clear
+            </Button>
+          )}
+          {!square && (
+            <Button small onClick={onUploadClick} busy={busy} disabled={!!pending}>
+              {item ? 'Replace picture' : 'Upload picture'}
+            </Button>
+          )}
+          <Button variant="ghost" small onClick={onClose}>
+            ✕
+          </Button>
+        </>
+      }
+    >
+      {pending ? (
+        <JigsawCropper
+          file={pending}
+          onCancel={onClearPending}
+          onConfirm={(cropped) => {
+            setSquare(cropped);
+            // The picked file has served its purpose; leaving it set would keep
+            // the cropper mounted over the form that comes next.
+            onClearPending();
+          }}
+        />
+      ) : (
+        <div className="grid grid--2">
+          <div className="grid" style={{ gap: 10, alignContent: 'start' }}>
+            <JigsawPreview imageUrl={previewUrl} pieceCount={pieceCount} />
+            {!item && !square && (
+              <Banner tone="info">
+                This is the category picture, which is what a student sees until you set one here.
+              </Banner>
+            )}
+            {square && <Banner tone="info">Not saved yet — fill in the text and save.</Banner>}
+          </div>
+
+          {item || square ? (
+            <div className="grid" style={{ gap: 14 }}>
+              {problem && <Banner tone="error">{problem}</Banner>}
+
+              <Field label="Name" hint="Shown as the caption when the puzzle is completed.">
+                <Input
+                  value={draft.title}
+                  onChange={(e) => patch({ title: e.target.value })}
+                  placeholder="Ang Katipunan"
+                  maxLength={80}
+                />
+              </Field>
+
+              <Field label="Definition — Tagalog" hint="One line, shown with the finished picture.">
+                <Input
+                  value={draft.definition_tl ?? ''}
+                  onChange={(e) => patch({ definition_tl: e.target.value })}
+                  placeholder="Ang lihim na samahang nagsimula ng himagsikan noong 1896."
+                  maxLength={400}
+                />
+              </Field>
+
+              <Field label="Definition — English">
+                <Input
+                  value={draft.definition_en ?? ''}
+                  onChange={(e) => patch({ definition_en: e.target.value })}
+                  placeholder="The secret society that started the 1896 revolution."
+                  maxLength={400}
+                />
+              </Field>
+
+              <Field
+                label="Mini-lesson — Tagalog"
+                hint="Shown to the student the moment they finish this puzzle."
+              >
+                <Textarea
+                  value={draft.context_tl ?? ''}
+                  onChange={(e) => patch({ context_tl: e.target.value })}
+                  placeholder="Ang Katipunan (KKK) ay isang lihim na samahang Pilipino na itinatag ni Andres Bonifacio noong 1892…"
+                  maxLength={4000}
+                />
+              </Field>
+
+              <Field label="Mini-lesson — English">
+                <Textarea
+                  value={draft.context_en ?? ''}
+                  onChange={(e) => patch({ context_en: e.target.value })}
+                  placeholder="The Katipunan (KKK) was a secret Filipino society founded by Andres Bonifacio in 1892…"
+                  maxLength={4000}
+                />
+              </Field>
+
+              <div className="row">
+                <Button onClick={save} busy={busy}>
+                  {square ? 'Save picture & lesson' : 'Save details'}
+                </Button>
+                {square && (
+                  <Button variant="secondary" onClick={() => setSquare(null)} disabled={busy}>
+                    Discard
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid" style={{ gap: 12, alignContent: 'start' }}>
+              <div>
+                <div className="field__label">Upload a picture for this activity</div>
+                <div className="field__hint">
+                  You choose the square after picking a file, then write the mini-lesson that goes
+                  with it — the board is square, and the lesson is what a student gets for solving
+                  it.
+                </div>
+              </div>
+
+              {reusable.length > 0 && (
+                <>
+                  <div className="field__label">…or reuse one already in this category</div>
+                  <div className="library">
+                    {reusable.map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        className="library__tile"
+                        onClick={() => onAssign(candidate.id)}
+                        disabled={busy}
+                      >
+                        <img src={candidate.imageUrl} alt="" className="thumb" />
+                        <span className="library__title">{candidate.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ---------------------------------------------------------------- fallback */
+
+function CategoryFallback({
+  category,
+  onSaved,
+}: {
+  category: ApiCategory;
+  onSaved: () => void;
+}) {
+  const [context, setContext] = useState(category.context_tl ?? '');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setContext(category.context_tl ?? ''), [category]);
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await contentApi.updateCategory(category.key, { context_tl: context.trim() || null });
+      setNotice('Saved.');
+      onSaved();
+    } catch (err) {
+      setError(errorMessage(err, 'The mini-lesson could not be saved.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card
+      title="Category fallback"
+      hint="Used by the mini-lesson list, and by any activity with no picture of its own"
+      actions={
+        <Button variant="secondary" small onClick={save} busy={busy}>
+          Save
+        </Button>
+      }
+    >
+      <div className="grid grid--2">
+        <div>
+          <div className="field__label" style={{ marginBottom: 6 }}>
+            Picture
+          </div>
+          <img
+            src={category.imageUrl ?? fallbackJigsawImage[category.key]}
+            alt=""
+            className="thumb"
+            style={{ maxWidth: 200 }}
+          />
+          <div className="field__hint" style={{ marginTop: 6 }}>
+            {category.imageUrl ? (
+              <Badge tone="green">Uploaded</Badge>
+            ) : (
+              <Badge>The image the game ships with</Badge>
+            )}
+          </div>
+        </div>
+
+        <Field label="Mini-lesson — Tagalog" hint="Shown on the category's mini-lesson card.">
+          <Textarea value={context} onChange={(e) => setContext(e.target.value)} maxLength={4000} />
+        </Field>
+      </div>
+
+      {error && <Banner tone="error">{error}</Banner>}
+      {notice && !error && <Banner tone="success">{notice}</Banner>}
+    </Card>
+  );
+}
