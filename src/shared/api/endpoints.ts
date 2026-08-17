@@ -10,6 +10,7 @@ import type {
   ApiCurrentUser,
   ApiGuestLeaderboard,
   ApiJigsawItem,
+  ApiJigsawPieceCount,
   ApiLeaderboard,
   ApiQuestion,
   ApiSession,
@@ -143,18 +144,24 @@ export const contentApi = {
   },
 
   /**
-   * Replaces the pictures and the activity assignments together. Upload, edit,
-   * delete and assign are all "the jigsaw content is now this", so an activity
-   * cannot be left pointing at a picture deleted in the same edit.
+   * Replaces the pictures, the activity assignments and the cuts together.
+   * Upload, edit, delete and assign are all "the jigsaw content is now this",
+   * so an activity cannot be left pointing at a picture deleted in the same
+   * edit.
    */
   replaceJigsaws(
     key: ApiCategoryKey,
     items: JigsawItemInput[],
     slots: Record<string, string>,
-  ): Promise<{ items: ApiJigsawItem[]; slots: Record<string, string> }> {
+    pieces: Record<string, ApiJigsawPieceCount>,
+  ): Promise<{
+    items: ApiJigsawItem[];
+    slots: Record<string, string>;
+    pieces: Record<string, ApiJigsawPieceCount>;
+  }> {
     return request(`/content/categories/${key}/jigsaws`, {
       method: 'PUT',
-      body: { items, slots },
+      body: { items, slots, pieces },
     });
   },
 

@@ -138,6 +138,9 @@ export interface ApiJigsawItem {
 /** `id` is omitted for a picture the server has not stored yet. */
 export type JigsawItemInput = Omit<ApiJigsawItem, 'id'> & { id?: string };
 
+/** The three cuts the game can lay out: 2×3, 3×3 and 3×4. */
+export type ApiJigsawPieceCount = 6 | 9 | 12;
+
 export interface ApiCategory {
   key: ApiCategoryKey;
   label: string;
@@ -156,6 +159,12 @@ export interface ApiCategory {
    * activity with no entry falls back to `imageUrl` above.
    */
   jigsawSlots: Record<string, string>;
+  /**
+   * How many pieces each activity is cut into, keyed the same way. An activity
+   * with no entry plays the game's default ramp — activities 1–2 are 6 pieces,
+   * 3–4 are 9, 5–6 are 12.
+   */
+  jigsawPieces: Record<string, ApiJigsawPieceCount>;
   updatedBy: string | null;
   updatedAt: string | null;
 }

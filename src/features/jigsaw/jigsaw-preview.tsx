@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ApiJigsawPieceCount } from '@/shared/api';
 import { generateEdgeMap, getPieceEdges, piecePathD } from './jigsaw-shapes';
 
 /**
@@ -20,11 +21,25 @@ function getGrid(pieceCount: number) {
   return { rows: 3, cols: 4 };
 }
 
-export const PIECE_COUNTS = [
+export const PIECE_COUNTS: { count: ApiJigsawPieceCount; label: string }[] = [
   { count: 6, label: '6 pieces · Easy' },
   { count: 9, label: '9 pieces · Medium' },
   { count: 12, label: '12 pieces · Hard' },
 ];
+
+/**
+ * The cut an activity plays when the admin has not chosen one.
+ *
+ * juanwise-app-v2 `activity-list-screen.tsx` `getPieceCount` — the ramp the
+ * game applied across a level's six activities before the console could set
+ * this. Leaving an activity unset keeps it, which is why the picker offers a
+ * "Default" entry rather than pre-filling 6 everywhere.
+ */
+export function defaultPieceCount(activityNum: number): ApiJigsawPieceCount {
+  if (activityNum <= 2) return 6;
+  if (activityNum <= 4) return 9;
+  return 12;
+}
 
 const BOARD = 320;
 

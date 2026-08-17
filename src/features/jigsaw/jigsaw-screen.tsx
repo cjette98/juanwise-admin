@@ -6,6 +6,7 @@ import {
   type ApiCategory,
   type ApiCategoryKey,
   type ApiJigsawItem,
+  type ApiJigsawPieceCount,
   type JigsawItemInput,
 } from '@/shared/api';
 import {
@@ -23,7 +24,7 @@ import { fallbackJigsawImage } from '@/shared/assets/images';
 import { useAsync } from '@/shared/lib/use-async';
 import { categoryColor, categoryMeta } from '@/shared/theme/colors';
 import JigsawCropper from './jigsaw-cropper';
-import JigsawPreview, { PIECE_COUNTS } from './jigsaw-preview';
+import JigsawPreview, { defaultPieceCount, PIECE_COUNTS } from './jigsaw-preview';
 
 /**
  * Jigsaw content, one picture per activity.
@@ -41,6 +42,12 @@ import JigsawPreview, { PIECE_COUNTS } from './jigsaw-preview';
  * An unassigned activity is not broken — it falls back to the category picture,
  * and below that to the image the game ships with. Assign the activities that
  * matter and leave the rest.
+ *
+ * Each activity also carries its own cut — 6, 9 or 12 pieces. That is a
+ * property of the activity rather than of the picture, so one picture reused
+ * across three activities can be easy in one and hard in another, and an
+ * activity with no picture of its own still has a cut. Left alone it plays the
+ * game's ramp (1–2 → 6, 3–4 → 9, 5–6 → 12).
  */
 
 const LEVELS = [1, 2, 3, 4, 5];
@@ -48,6 +55,9 @@ const ACTIVITIES = [1, 2, 3, 4, 5, 6];
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 const slotKey = (level: number, activityNum: number) => `${level}_${activityNum}`;
+
+/** One activity's cut, or `null` while it follows the game's default ramp. */
+type SlotCut = ApiJigsawPieceCount | null;
 
 /** The text an admin writes about a picture — the same fields whether adding or editing. */
 interface PictureDetails {
@@ -113,9 +123,9 @@ export default function JigsawScreen() {
 function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved: () => void }) {
   const [items, setItems] = useState<ApiJigsawItem[]>(category.jigsaws);
   const [slots, setSlots] = useState<Record<string, string>>(category.jigsawSlots);
+  const [pieces, setPieces] = useState<Record<string, ApiJigsawPieceCount>>(category.jigsawPieces);
   const [openSlot, setOpenSlot] = useState<string | null>(null);
   const [pending, setPending] = useState<File | null>(null);
-  const [pieceCount, setPieceCount] = useState(6);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -124,6 +134,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
   useEffect(() => {
     setItems(category.jigsaws);
     setSlots(category.jigsawSlots);
+    setPieces(category.jigsawPieces);
     setOpenSlot(null);
   }, [category]);
 
@@ -132,19 +143,26 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
 
   const openItem = openSlot ? (itemById.get(slots[openSlot] ?? '') ?? null) : null;
 
-  /** Every write sends the whole set, so assign/edit/clear share one path. */
+  /** Every write sends the whole set, so assign/edit/clear/cut share one path. */
   const persist = async (
     nextItems: JigsawItemInput[],
     nextSlots: Record<string, string>,
+    nextPieces: Record<string, ApiJigsawPieceCount>,
     message: string,
   ) => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const saved = await contentApi.replaceJigsaws(category.key, nextItems, nextSlots);
+      const saved = await contentApi.replaceJigsaws(
+        category.key,
+        nextItems,
+        nextSlots,
+        nextPieces,
+      );
       setItems(saved.items);
       setSlots(saved.slots);
+      setPieces(saved.pieces);
       setNotice(message);
       onSaved();
       return saved;
@@ -180,7 +198,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
    * add — a picture nothing plays, or a slot pointing at nothing — is then not
    * a state that can exist.
    */
-  const createForSlot = async (square: File, details: PictureDetails) => {
+  const createForSlot = async (square: File, details: PictureDetails, cut: SlotCut) => {
     if (!openSlot) return;
     setPending(null);
     if (fileInput.current) fileInput.current.value = '';
@@ -196,6 +214,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
       await persist(
         [...items, { id, imageUrl, ...details }],
         { ...slots, [openSlot]: id },
+        piecesWith(openSlot, cut),
         'Picture and mini-lesson saved. Students see the lesson when they finish this puzzle.',
       );
     } catch (err) {
@@ -207,22 +226,86 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
 
   const assignExisting = (id: string) => {
     if (!openSlot) return;
-    void persist(items, { ...slots, [openSlot]: id }, 'Picture assigned to this activity.');
+    void persist(items, { ...slots, [openSlot]: id }, pieces, 'Picture assigned to this activity.');
   };
 
   const clearSlot = () => {
     if (!openSlot) return;
     const next = { ...slots };
     delete next[openSlot];
-    void persist(items, next, 'Activity cleared — it falls back to the category picture.');
+    void persist(
+      items,
+      next,
+      pieces,
+      'Activity cleared — it falls back to the category picture.',
+    );
   };
 
-  const saveItem = (patch: ApiJigsawItem) =>
+  const saveItem = (patch: ApiJigsawItem, cut: SlotCut) =>
     persist(
       items.map((item) => (item.id === patch.id ? patch : item)),
       slots,
+      openSlot ? piecesWith(openSlot, cut) : pieces,
       'Saved.',
     );
+
+  /**
+   * The cut map with one activity's choice applied.
+   *
+   * `null` removes the entry rather than storing a number, so the activity goes
+   * back to following the game's ramp instead of being pinned to whatever the
+   * ramp happens to say today.
+   */
+  const piecesWith = (slot: string, cut: SlotCut) => {
+    const next = { ...pieces };
+    if (cut === null) delete next[slot];
+    else next[slot] = cut;
+    return next;
+  };
+
+  /** For an activity whose cut is the only thing that changed. */
+  const saveCut = (cut: SlotCut) => {
+    if (!openSlot) return;
+    const [level, activityNum] = openSlot.split('_');
+    void persist(
+      items,
+      slots,
+      piecesWith(openSlot, cut),
+      cut === null
+        ? `Level ${level} · Activity ${activityNum} follows the default cut again — ${defaultPieceCount(Number(activityNum))} pieces.`
+        : `Level ${level} · Activity ${activityNum} is now cut into ${cut} pieces.`,
+    );
+  };
+
+  /**
+   * Deletes the picture itself, not just this activity's use of it.
+   *
+   * Every activity pointing at it is unassigned in the same request: the API
+   * rejects a slot referencing a picture that is not in `items`, and an admin
+   * deleting a picture from one activity should not be surprised by it
+   * surviving in another. The cuts are left alone — they belong to the
+   * activities, which still play, on the category fallback.
+   *
+   * The uploaded file stays in Cloud Storage; nothing links to it any more.
+   */
+  const deleteItem = () => {
+    if (!openItem) return;
+    const usedBy = Object.values(slots).filter((id) => id === openItem.id).length;
+    const warning =
+      usedBy > 1
+        ? `Delete “${openItem.title}”? It is assigned to ${usedBy} activities — all of them fall back to the category picture.`
+        : `Delete “${openItem.title}”? This activity falls back to the category picture.`;
+    if (!window.confirm(warning)) return;
+
+    void persist(
+      items.filter((item) => item.id !== openItem.id),
+      Object.fromEntries(Object.entries(slots).filter(([, id]) => id !== openItem.id)),
+      pieces,
+      usedBy > 1
+        ? `Picture deleted. ${usedBy} activities fall back to the category picture.`
+        : 'Picture deleted — this activity falls back to the category picture.',
+    );
+  };
 
   return (
     <>
@@ -239,20 +322,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
 
       <Card
         title={`${category.label} — jigsaw activities`}
-        hint={`${assignedCount} of 30 assigned. Click an activity to give it a picture; the rest fall back to the category picture.`}
-        actions={
-          <Select
-            value={pieceCount}
-            onChange={(e) => setPieceCount(Number(e.target.value))}
-            style={{ width: 180 }}
-          >
-            {PIECE_COUNTS.map((option) => (
-              <option key={option.count} value={option.count}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        }
+        hint={`${assignedCount} of 30 assigned. Click an activity to give it a picture and choose how many pieces it is cut into; the rest fall back to the category picture and the default cut.`}
         bodyless
       >
         <div className="table-wrap">
@@ -272,6 +342,8 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
                   {ACTIVITIES.map((activityNum) => {
                     const key = slotKey(level, activityNum);
                     const item = itemById.get(slots[key] ?? '');
+                    const chosenCut = pieces[key];
+                    const cut = chosenCut ?? defaultPieceCount(activityNum);
                     return (
                       <td key={activityNum}>
                         <button
@@ -293,6 +365,16 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
                               <span className="slot__title">Not set</span>
                             </>
                           )}
+                          <span
+                            className={`slot__cut ${chosenCut ? 'slot__cut--set' : ''}`}
+                            title={
+                              chosenCut
+                                ? `Cut into ${cut} pieces`
+                                : `Default cut for activity ${activityNum} — ${cut} pieces`
+                            }
+                          >
+                            {cut}
+                          </span>
                         </button>
                       </td>
                     );
@@ -309,7 +391,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
           slot={openSlot}
           item={openItem}
           items={items}
-          pieceCount={pieceCount}
+          chosenPieces={pieces[openSlot] ?? null}
           busy={busy}
           pending={pending}
           fallbackUrl={category.imageUrl ?? fallbackJigsawImage[category.key]}
@@ -321,7 +403,9 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
           onCreate={createForSlot}
           onAssign={assignExisting}
           onClear={clearSlot}
+          onDelete={deleteItem}
           onSaveItem={saveItem}
+          onSaveCut={saveCut}
           onClose={() => setOpenSlot(null)}
         />
       )}
@@ -337,7 +421,7 @@ function SlotEditor({
   slot,
   item,
   items,
-  pieceCount,
+  chosenPieces,
   busy,
   pending,
   fallbackUrl,
@@ -346,26 +430,35 @@ function SlotEditor({
   onCreate,
   onAssign,
   onClear,
+  onDelete,
   onSaveItem,
+  onSaveCut,
   onClose,
 }: {
   slot: string;
   item: ApiJigsawItem | null;
   items: ApiJigsawItem[];
-  pieceCount: number;
+  /** The stored cut, or null while this activity follows the ramp. */
+  chosenPieces: SlotCut;
   busy: boolean;
   pending: File | null;
   fallbackUrl: string;
   onUploadClick: () => void;
   /** Drops the picked file, whether the crop was confirmed or abandoned. */
   onClearPending: () => void;
-  onCreate: (square: File, details: PictureDetails) => void;
+  onCreate: (square: File, details: PictureDetails, cut: SlotCut) => void;
   onAssign: (id: string) => void;
+  /** Unassigns this activity; the picture stays in the category. */
   onClear: () => void;
-  onSaveItem: (item: ApiJigsawItem) => Promise<unknown>;
+  /** Deletes the picture from the category, unassigning every activity on it. */
+  onDelete: () => void;
+  onSaveItem: (item: ApiJigsawItem, cut: SlotCut) => Promise<unknown>;
+  /** For an activity with no picture, where the cut is all there is to save. */
+  onSaveCut: (cut: SlotCut) => void;
   onClose: () => void;
 }) {
   const [level, activityNum] = slot.split('_');
+  const rampPieces = defaultPieceCount(Number(activityNum));
 
   /**
    * The add flow is crop → write → save, so the cropped square is held here
@@ -376,6 +469,9 @@ function SlotEditor({
    */
   const [square, setSquare] = useState<File | null>(null);
   const [draft, setDraft] = useState<PictureDetails>(emptyDetails(level, activityNum));
+  // The cut is a draft like the rest of the form: it goes out with Save, not on
+  // the change, so one trip through this editor is one write.
+  const [cut, setCut] = useState<SlotCut>(chosenPieces);
   const [problem, setProblem] = useState<string | null>(null);
 
   // Reopening on a different activity, or on one whose picture changed, starts
@@ -383,13 +479,26 @@ function SlotEditor({
   useEffect(() => {
     setSquare(null);
     setDraft(item ?? emptyDetails(level, activityNum));
+    setCut(chosenPieces);
     setProblem(null);
-  }, [item, level, activityNum]);
+  }, [item, chosenPieces, level, activityNum]);
 
   const patch = (next: Partial<PictureDetails>) =>
     setDraft((current) => ({ ...current, ...next }));
 
+  // The preview cuts the picture the way this activity will once saved, so an
+  // admin sees the board a student gets rather than a generic one.
+  const pieceCount = cut ?? rampPieces;
+
   const save = () => {
+    // An activity with no picture has nothing to name — the cut is the whole
+    // form, so the title rule would only be in the way.
+    if (!item && !square) {
+      setProblem(null);
+      onSaveCut(cut);
+      return;
+    }
+
     if (!draft.title.trim()) {
       setProblem('Give the picture a name — it is the caption a student sees.');
       return;
@@ -404,8 +513,8 @@ function SlotEditor({
       context_tl: draft.context_tl?.trim() || null,
     };
 
-    if (square) onCreate(square, details);
-    else if (item) void onSaveItem({ ...item, ...details });
+    if (square) onCreate(square, details, cut);
+    else if (item) void onSaveItem({ ...item, ...details }, cut);
   };
 
   /** Pictures already uploaded to this category, minus the one already here. */
@@ -440,9 +549,17 @@ function SlotEditor({
       actions={
         <>
           {item && !square && (
-            <Button variant="secondary" small onClick={onClear} disabled={busy}>
-              Clear
-            </Button>
+            <>
+              {/* Two different retreats: Clear frees this activity and keeps the
+                  picture for reuse, Delete removes the picture from the
+                  category altogether. */}
+              <Button variant="danger" small onClick={onDelete} disabled={busy}>
+                Delete picture
+              </Button>
+              <Button variant="secondary" small onClick={onClear} disabled={busy}>
+                Clear
+              </Button>
+            </>
           )}
           {!square && (
             <Button small onClick={onUploadClick} busy={busy} disabled={!!pending}>
@@ -478,100 +595,132 @@ function SlotEditor({
             {square && <Banner tone="info">Not saved yet — fill in the text and save.</Banner>}
           </div>
 
-          {item || square ? (
-            <div className="grid" style={{ gap: 14 }}>
-              {problem && <Banner tone="error">{problem}</Banner>}
+          <div className="grid" style={{ gap: 14, alignContent: 'start' }}>
+            {problem && <Banner tone="error">{problem}</Banner>}
 
-              <Field label="Name" hint="Shown as the caption when the puzzle is completed.">
-                <Input
-                  value={draft.title}
-                  onChange={(e) => patch({ title: e.target.value })}
-                  placeholder="Ang Katipunan"
-                  maxLength={80}
-                />
-              </Field>
-
-              <Field label="Definition — Tagalog" hint="One line, shown with the finished picture.">
-                <Input
-                  value={draft.definition_tl ?? ''}
-                  onChange={(e) => patch({ definition_tl: e.target.value })}
-                  placeholder="Ang lihim na samahang nagsimula ng himagsikan noong 1896."
-                  maxLength={400}
-                />
-              </Field>
-
-              <Field label="Definition — English">
-                <Input
-                  value={draft.definition_en ?? ''}
-                  onChange={(e) => patch({ definition_en: e.target.value })}
-                  placeholder="The secret society that started the 1896 revolution."
-                  maxLength={400}
-                />
-              </Field>
-
-              <Field
-                label="Mini-lesson — Tagalog"
-                hint="Shown to the student the moment they finish this puzzle."
+            <Field
+              label="Pieces"
+              hint={
+                cut === null
+                  ? `Following the game's default for activity ${activityNum} — ${rampPieces} pieces. The preview re-cuts as you change this; save to keep it.`
+                  : 'The board students play. The preview re-cuts as you change this; save to keep it.'
+              }
+            >
+              <Select
+                value={cut ?? 'default'}
+                disabled={busy}
+                onChange={(e) =>
+                  setCut(
+                    e.target.value === 'default'
+                      ? null
+                      : (Number(e.target.value) as ApiJigsawPieceCount),
+                  )
+                }
               >
-                <Textarea
-                  value={draft.context_tl ?? ''}
-                  onChange={(e) => patch({ context_tl: e.target.value })}
-                  placeholder="Ang Katipunan (KKK) ay isang lihim na samahang Pilipino na itinatag ni Andres Bonifacio noong 1892…"
-                  maxLength={4000}
-                />
-              </Field>
+                <option value="default">Default · {rampPieces} pieces</option>
+                {PIECE_COUNTS.map((option) => (
+                  <option key={option.count} value={option.count}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-              <Field label="Mini-lesson — English">
-                <Textarea
-                  value={draft.context_en ?? ''}
-                  onChange={(e) => patch({ context_en: e.target.value })}
-                  placeholder="The Katipunan (KKK) was a secret Filipino society founded by Andres Bonifacio in 1892…"
-                  maxLength={4000}
-                />
-              </Field>
+            {item || square ? (
+              <>
+                <Field label="Name" hint="Shown as the caption when the puzzle is completed.">
+                  <Input
+                    value={draft.title}
+                    onChange={(e) => patch({ title: e.target.value })}
+                    placeholder="Ang Katipunan"
+                    maxLength={80}
+                  />
+                </Field>
 
-              <div className="row">
-                <Button onClick={save} busy={busy}>
-                  {square ? 'Save picture & lesson' : 'Save details'}
-                </Button>
-                {square && (
-                  <Button variant="secondary" onClick={() => setSquare(null)} disabled={busy}>
-                    Discard
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="grid" style={{ gap: 12, alignContent: 'start' }}>
-              <div>
-                <div className="field__label">Upload a picture for this activity</div>
-                <div className="field__hint">
-                  You choose the square after picking a file, then write the mini-lesson that goes
-                  with it — the board is square, and the lesson is what a student gets for solving
-                  it.
-                </div>
-              </div>
+                <Field label="Definition — Tagalog" hint="One line, shown with the finished picture.">
+                  <Input
+                    value={draft.definition_tl ?? ''}
+                    onChange={(e) => patch({ definition_tl: e.target.value })}
+                    placeholder="Ang lihim na samahang nagsimula ng himagsikan noong 1896."
+                    maxLength={400}
+                  />
+                </Field>
 
-              {reusable.length > 0 && (
-                <>
-                  <div className="field__label">…or reuse one already in this category</div>
-                  <div className="library">
-                    {reusable.map((candidate) => (
-                      <button
-                        key={candidate.id}
-                        className="library__tile"
-                        onClick={() => onAssign(candidate.id)}
-                        disabled={busy}
-                      >
-                        <img src={candidate.imageUrl} alt="" className="thumb" />
-                        <span className="library__title">{candidate.title}</span>
-                      </button>
-                    ))}
+                <Field label="Definition — English">
+                  <Input
+                    value={draft.definition_en ?? ''}
+                    onChange={(e) => patch({ definition_en: e.target.value })}
+                    placeholder="The secret society that started the 1896 revolution."
+                    maxLength={400}
+                  />
+                </Field>
+
+                <Field
+                  label="Mini-lesson — Tagalog"
+                  hint="Shown to the student the moment they finish this puzzle."
+                >
+                  <Textarea
+                    value={draft.context_tl ?? ''}
+                    onChange={(e) => patch({ context_tl: e.target.value })}
+                    placeholder="Ang Katipunan (KKK) ay isang lihim na samahang Pilipino na itinatag ni Andres Bonifacio noong 1892…"
+                    maxLength={4000}
+                  />
+                </Field>
+
+                <Field label="Mini-lesson — English">
+                  <Textarea
+                    value={draft.context_en ?? ''}
+                    onChange={(e) => patch({ context_en: e.target.value })}
+                    placeholder="The Katipunan (KKK) was a secret Filipino society founded by Andres Bonifacio in 1892…"
+                    maxLength={4000}
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div className="field__label">Upload a picture for this activity</div>
+                  <div className="field__hint">
+                    You choose the square after picking a file, then write the mini-lesson that goes
+                    with it — the board is square, and the lesson is what a student gets for solving
+                    it.
                   </div>
-                </>
+                </div>
+
+                {reusable.length > 0 && (
+                  <>
+                    <div className="field__label">…or reuse one already in this category</div>
+                    <div className="library">
+                      {reusable.map((candidate) => (
+                        <button
+                          key={candidate.id}
+                          className="library__tile"
+                          onClick={() => onAssign(candidate.id)}
+                          disabled={busy}
+                        >
+                          <img src={candidate.imageUrl} alt="" className="thumb" />
+                          <span className="library__title">{candidate.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* One Save for the whole editor — the cut goes out with the text
+                it sits beside, so an activity is never half-written. */}
+            <div className="row">
+              <Button onClick={save} busy={busy}>
+                {square ? 'Save picture & lesson' : item ? 'Save details' : 'Save cut'}
+              </Button>
+              {square && (
+                <Button variant="secondary" onClick={() => setSquare(null)} disabled={busy}>
+                  Discard
+                </Button>
               )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </Card>

@@ -423,6 +423,40 @@ textarea {
   line-height: 1.55;
 }
 
+.input-reveal {
+  position: relative;
+  display: flex;
+}
+
+.input--reveal {
+  padding-right: 40px;
+}
+
+.input-reveal__toggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.input-reveal__toggle:hover {
+  color: var(--ink);
+}
+
+.input-reveal__toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--blue-tint);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -867,11 +901,35 @@ textarea {
 }
 
 .slot__title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * How many pieces this activity is cut into. Muted while it is the default
+ * ramp and highlighted once an admin has chosen, so the grid shows at a glance
+ * which cuts were decided and which were inherited.
+ */
+.slot__cut {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--canvas);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.slot__cut--set {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+  color: var(--blue);
 }
 
 .cropper {

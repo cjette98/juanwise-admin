@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { API_ORIGIN, errorMessage } from '@/shared/api';
+import { errorMessage } from '@/shared/api';
 import { images } from '@/shared/assets/images';
-import { Banner, Button, Field, Input } from '@/shared/components/ui';
+import { Banner, Button, Field, Input, PasswordInput } from '@/shared/components/ui';
 import { useAuth } from './auth-context';
 
 export default function LoginScreen() {
@@ -71,8 +71,7 @@ export default function LoginScreen() {
           </Field>
 
           <Field label="Password">
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
@@ -83,11 +82,6 @@ export default function LoginScreen() {
           <Button type="submit" block busy={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
-
-          <p className="field__hint">
-            Signing in to <code>{API_ORIGIN}</code>. An account is made an admin with{' '}
-            <code>npm run grant-admin</code> in juanwise-be.
-          </p>
         </form>
       </main>
     </div>

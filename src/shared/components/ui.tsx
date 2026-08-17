@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 /**
@@ -115,6 +116,54 @@ export function Field({
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`input ${props.className ?? ''}`} />;
+}
+
+/** A password box with an eye button that reveals what was typed. */
+export function PasswordInput({
+  className = '',
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [shown, setShown] = useState(false);
+
+  return (
+    <div className="input-reveal">
+      <input
+        {...props}
+        type={shown ? 'text' : 'password'}
+        className={`input input--reveal ${className}`}
+      />
+      <button
+        type="button"
+        className="input-reveal__toggle"
+        onClick={() => setShown((value) => !value)}
+        aria-label={shown ? 'Hide password' : 'Show password'}
+        aria-pressed={shown}
+        title={shown ? 'Hide password' : 'Show password'}
+      >
+        <EyeIcon off={shown} />
+      </button>
+    </div>
+  );
+}
+
+function EyeIcon({ off }: { off?: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M1.5 12S5.2 5.5 12 5.5 22.5 12 22.5 12 18.8 18.5 12 18.5 1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3.2" />
+      {off && <line x1="3.5" y1="20.5" x2="20.5" y2="3.5" />}
+    </svg>
+  );
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {

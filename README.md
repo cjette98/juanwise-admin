@@ -114,6 +114,15 @@ Each picture carries its own:
 You can also reuse a picture already uploaded to that category instead of
 uploading again.
 
+Two different retreats, both in the activity's header:
+
+- **Clear** frees this activity only. The picture stays in the category and can
+  be assigned again from the reuse list.
+- **Delete picture** removes the picture from the category altogether. Every
+  activity assigned to it is unassigned in the same save — you are told how many
+  before it happens — and each falls back to the category picture. The uploaded
+  file itself stays in Cloud Storage; nothing points at it any more.
+
 Uploading and assigning are separate underneath: pictures belong to the
 category, a slot points at one. That is invisible in the common case, but means
 the same picture can serve several activities without being uploaded twice.
@@ -121,6 +130,25 @@ the same picture can serve several activities without being uploaded twice.
 An unassigned activity is **not** broken — it falls back to the category
 picture, and below that to the image the game ships with. Assign the activities
 that matter and leave the rest; there is no obligation to fill all 30.
+
+### How many pieces
+
+Each activity is also given its own cut — **6, 9 or 12 pieces** — in the
+**Pieces** picker at the top of the activity's form. The preview re-cuts as you
+change it, and it is written by the same **Save** as the rest of the form, so
+one trip through the editor is one save. The number on every cell in the grid
+shows what that activity plays: grey while it follows the default, blue once you
+have chosen.
+
+The cut belongs to the activity, not to the picture, so one picture reused
+across three activities can be an easy board in one and a hard one in another —
+and an activity with no picture of its own still has a cut, because it still
+plays, on the category fallback.
+
+**Default** is not the same as 6. An activity left on Default follows the game's
+ramp across a level's six activities — 1–2 are 6 pieces, 3–4 are 9, 5–6 are 12 —
+so choosing it back later restores the ramp rather than pinning the activity to
+whatever the ramp says today.
 
 The board is square and most pictures are not, so choosing a file opens a
 cropper rather than uploading straight away. **Fill square** covers the board and
