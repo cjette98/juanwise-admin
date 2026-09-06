@@ -124,7 +124,8 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
   const [items, setItems] = useState<ApiJigsawItem[]>(category.jigsaws);
   const [slots, setSlots] = useState<Record<string, string>>(category.jigsawSlots);
   const [pieces, setPieces] = useState<Record<string, ApiJigsawPieceCount>>(category.jigsawPieces);
-  const [openSlot, setOpenSlot] = useState<string | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [openSlot, setOpenSlot] = useState<string | null>(slotKey(1, 1));
   const [pending, setPending] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -135,7 +136,8 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
     setItems(category.jigsaws);
     setSlots(category.jigsawSlots);
     setPieces(category.jigsawPieces);
-    setOpenSlot(null);
+    setSelectedLevel(1);
+    setOpenSlot(slotKey(1, 1));
   }, [category]);
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -320,95 +322,90 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
         onChange={(e) => pickFile(e.target.files?.[0])}
       />
 
-      <Card
-        title={`${category.label} — jigsaw activities`}
-        hint={`${assignedCount} of 30 assigned. Click an activity to give it a picture and choose how many pieces it is cut into; the rest fall back to the category picture and the default cut.`}
-        bodyless
-      >
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Level</th>
-                {ACTIVITIES.map((num) => (
-                  <th key={num}>Activity {num}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {LEVELS.map((level) => (
-                <tr key={level}>
-                  <td className="table__primary">Level {level}</td>
-                  {ACTIVITIES.map((activityNum) => {
-                    const key = slotKey(level, activityNum);
-                    const item = itemById.get(slots[key] ?? '');
-                    const chosenCut = pieces[key];
-                    const cut = chosenCut ?? defaultPieceCount(activityNum);
-                    return (
-                      <td key={activityNum}>
-                        <button
-                          className={`slot ${openSlot === key ? 'slot--active' : ''} ${
-                            item ? '' : 'slot--empty'
-                          }`}
-                          onClick={() => setOpenSlot(openSlot === key ? null : key)}
-                        >
-                          {item ? (
-                            <>
-                              <img src={item.imageUrl} alt="" className="slot__thumb" />
-                              <span className="slot__title">{item.title}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="slot__plus" aria-hidden>
-                                +
-                              </span>
-                              <span className="slot__title">Not set</span>
-                            </>
-                          )}
-                          <span
-                            className={`slot__cut ${chosenCut ? 'slot__cut--set' : ''}`}
-                            title={
-                              chosenCut
-                                ? `Cut into ${cut} pieces`
-                                : `Default cut for activity ${activityNum} — ${cut} pieces`
-                            }
-                          >
-                            {cut}
-                          </span>
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="jigsaw-overview">
+        <div>
+          <div className="jigsaw-overview__eyebrow">{category.label} collection</div>
+          <h2>Choose an activity to edit</h2>
+          <p>{assignedCount} of 30 activities ready</p>
         </div>
-      </Card>
+        <div className="jigsaw-progress" aria-label={`${assignedCount} of 30 activities ready`}>
+          <span style={{ width: `${(assignedCount / 30) * 100}%`, background: categoryColor(category.key) }} />
+        </div>
+      </section>
 
-      {openSlot && (
-        <SlotEditor
-          slot={openSlot}
-          item={openItem}
-          items={items}
-          chosenPieces={pieces[openSlot] ?? null}
-          busy={busy}
-          pending={pending}
-          fallbackUrl={category.imageUrl ?? fallbackJigsawImage[category.key]}
-          onUploadClick={() => fileInput.current?.click()}
-          onClearPending={() => {
-            setPending(null);
-            if (fileInput.current) fileInput.current.value = '';
-          }}
-          onCreate={createForSlot}
-          onAssign={assignExisting}
-          onClear={clearSlot}
-          onDelete={deleteItem}
-          onSaveItem={saveItem}
-          onSaveCut={saveCut}
-          onClose={() => setOpenSlot(null)}
-        />
-      )}
+      <nav className="jigsaw-levels" aria-label="Jigsaw levels">
+        {LEVELS.map((level) => {
+          const ready = ACTIVITIES.filter((activity) => slots[slotKey(level, activity)]).length;
+          return (
+            <button
+              key={level}
+              className={`jigsaw-level ${selectedLevel === level ? 'jigsaw-level--active' : ''}`}
+              onClick={() => {
+                setSelectedLevel(level);
+                setOpenSlot(slotKey(level, 1));
+              }}
+            >
+              <span>Level {level}</span>
+              <small>{ready}/6 ready</small>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="jigsaw-workspace">
+        <section className="jigsaw-workspace__activities" aria-label={`Level ${selectedLevel} activities`}>
+          <div className="jigsaw-section-heading">
+            <div><span className="jigsaw-overview__eyebrow">Level {selectedLevel}</span><h3>Activities</h3></div>
+            <span className="field__hint">Select a card to edit</span>
+          </div>
+          <div className="jigsaw-activity-grid">
+            {ACTIVITIES.map((activityNum) => {
+              const key = slotKey(selectedLevel, activityNum);
+              const item = itemById.get(slots[key] ?? '');
+              const chosenCut = pieces[key];
+              const cut = chosenCut ?? defaultPieceCount(activityNum);
+              return (
+                <button
+                  key={activityNum}
+                  className={`jigsaw-activity-card ${openSlot === key ? 'jigsaw-activity-card--active' : ''} ${item ? '' : 'jigsaw-activity-card--empty'}`}
+                  onClick={() => setOpenSlot(key)}
+                  aria-pressed={openSlot === key}
+                >
+                  {item ? <img src={item.imageUrl} alt="" /> : <span className="jigsaw-activity-card__empty" aria-hidden>+</span>}
+                  <span className="jigsaw-activity-card__body">
+                    <span className="jigsaw-activity-card__topline"><strong>Activity {activityNum}</strong><span className={`slot__cut ${chosenCut ? 'slot__cut--set' : ''}`}>{cut} pcs</span></span>
+                    <span className="jigsaw-activity-card__title">{item?.title ?? 'Add a picture'}</span>
+                    <span className={`jigsaw-activity-card__status ${item ? 'jigsaw-activity-card__status--ready' : ''}`}>{item ? 'Ready' : 'Needs picture'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="jigsaw-workspace__editor">
+          {openSlot && (
+            <SlotEditor
+              slot={openSlot}
+              item={openItem}
+              items={items}
+              chosenPieces={pieces[openSlot] ?? null}
+              busy={busy}
+              pending={pending}
+              fallbackUrl={category.imageUrl ?? fallbackJigsawImage[category.key]}
+              onUploadClick={() => fileInput.current?.click()}
+              onClearPending={() => { setPending(null); if (fileInput.current) fileInput.current.value = ''; }}
+              onCreate={createForSlot}
+              onAssign={assignExisting}
+              onClear={clearSlot}
+              onDelete={deleteItem}
+              onSaveItem={saveItem}
+              onSaveCut={saveCut}
+              onClose={() => setOpenSlot(null)}
+            />
+          )}
+        </aside>
+      </div>
 
       <CategoryFallback category={category} onSaved={onSaved} />
     </>
