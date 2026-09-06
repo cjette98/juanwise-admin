@@ -28,6 +28,7 @@ const question = (over: Partial<ApiQuestion> = {}): ApiQuestion => ({
   question: 'Sino ang nagtatag ng Katipunan?',
   hint: 'Itinatag noong 1892.',
   explanation: 'Si Andrés Bonifacio.',
+  miniLesson: null,
   choices: ['Andrés Bonifacio', 'José Rizal'],
   correctAnswer: 'Andrés Bonifacio',
   answerPool: null,
@@ -93,7 +94,7 @@ describe('confirming a destructive type change', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Change to Identification?')).toBeInTheDocument();
     expect(
-      within(dialog).getByText('Your question, hint, and explanation will stay.'),
+      within(dialog).getByText('Your question, hint, explanation, and mini-lesson will stay.'),
     ).toBeInTheDocument();
     expect(within(dialog).getByText(/2 choices and the answer you marked correct/)).toBeInTheDocument();
   });
@@ -163,6 +164,7 @@ describe('identification answer fields', () => {
       question: 'Sino ang nagtatag ng Katipunan?',
       hint: 'Itinatag noong 1892.',
       explanation: 'Si Andrés Bonifacio.',
+      miniLesson: null,
       correctAnswer: 'Andrés Bonifacio',
       acceptedAnswers: ['Andres Bonifacio'],
     });
@@ -177,5 +179,36 @@ describe('identification answer fields', () => {
     expect(upsertQuestion).not.toHaveBeenCalled();
     // The alternative the admin typed is still there to fix, not discarded.
     expect(screen.getByDisplayValue('Andres Bonifacio')).toBeInTheDocument();
+  });
+});
+
+describe('mini-lesson field', () => {
+  const lesson = 'Ang Katipunan ay lihim na samahang itinatag noong 1892 sa Tondo.';
+
+  it('shows the stored mini-lesson in an editable field', async () => {
+    await renderScreen(question({ miniLesson: lesson }));
+    expect(screen.getByLabelText(/^Mini-lesson/)).toHaveValue(lesson);
+  });
+
+  it('sends what the admin typed into the mini-lesson', async () => {
+    const { user } = await renderScreen();
+    await user.type(screen.getByLabelText(/^Mini-lesson/), lesson);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(upsertQuestion).toHaveBeenCalledTimes(1));
+    expect(upsertQuestion).toHaveBeenCalledWith(
+      'history',
+      1,
+      1,
+      expect.objectContaining({ miniLesson: lesson }),
+    );
+  });
+
+  it('survives a question type change', async () => {
+    const { user } = await renderScreen(
+      question({ miniLesson: lesson, choices: null, correctAnswer: null }),
+    );
+    await user.click(typeRadio(/Identification/));
+    expect(screen.getByLabelText(/^Mini-lesson/)).toHaveValue(lesson);
   });
 });

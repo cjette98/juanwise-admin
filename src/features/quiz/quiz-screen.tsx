@@ -332,7 +332,7 @@ function QuestionEditor({
           onConfirm={confirmTypeChange}
           onCancel={() => setPendingType(null)}
         >
-          <p>Your question, hint, and explanation will stay.</p>
+          <p>Your question, hint, explanation, and mini-lesson will stay.</p>
           <p className="dialog__warning">
             This removes {answerContentSummary(draft)}. Nothing is saved until you choose Save
             changes.
@@ -529,6 +529,23 @@ function QuestionEditor({
             />
           </Field>
         </div>
+
+        {/*
+          Full width rather than a third column beside Hint and Explanation:
+          those are one-liners, this is a paragraph the student reads after the
+          activity, so a cramped input would hide most of what was written.
+        */}
+        <Field
+          label="Mini-lesson"
+          hint="The longer write-up on the mini-lessons screen. Falls back to the explanation when empty. Optional."
+        >
+          <Textarea
+            rows={6}
+            value={draft.miniLesson}
+            onChange={(e) => patch({ miniLesson: e.target.value })}
+            placeholder="Ang Katipunan ay lihim na samahang itinatag ni Andres Bonifacio noong Hulyo 7, 1892 sa Tondo, Maynila..."
+          />
+        </Field>
       </div>
     </Card>
   );

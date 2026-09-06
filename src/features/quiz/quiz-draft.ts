@@ -22,6 +22,8 @@ export interface QuizDraft {
   question: string;
   hint: string;
   explanation: string;
+  /** Longer write-up shown on the game's mini-lessons screen after the activity. */
+  miniLesson: string;
   /** multiple-choice */
   choices: string[];
   /** multiple-choice and identification both store their answer here. */
@@ -55,6 +57,8 @@ export function toQuizDraft(q: ApiQuestion): QuizDraft {
     question: q.question ?? '',
     hint: q.hint ?? '',
     explanation: q.explanation ?? '',
+    // Null on any question stored before mini-lessons existed.
+    miniLesson: q.miniLesson ?? '',
     choices: q.choices?.length ? [...q.choices] : ['', ''],
     correctAnswer: q.correctAnswer ?? '',
     answerPool: q.answerPool ? [...q.answerPool] : [],
@@ -114,6 +118,9 @@ export function toQuestionRequest(draft: QuizDraft): UpsertQuestionRequest {
     question: draft.question.trim(),
     hint: draft.hint.trim() || null,
     explanation: draft.explanation.trim() || null,
+    // Shared by all three types: the mini-lesson teaches the topic, so it is
+    // not answer data and does not belong to any one type.
+    miniLesson: draft.miniLesson.trim() || null,
   };
 
   if (draft.type === 'enumeration') {
@@ -174,5 +181,6 @@ export function switchQuestionType(draft: QuizDraft, nextType: ApiQuestionType):
     question: draft.question,
     hint: draft.hint,
     explanation: draft.explanation,
+    miniLesson: draft.miniLesson,
   };
 }
