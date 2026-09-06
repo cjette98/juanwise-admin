@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  contentApi,
-  errorMessage,
-  type ApiCategoryKey,
-  type ApiQuestion,
-  type UpsertQuestionRequest,
-} from '@/shared/api';
+import { contentApi, errorMessage, type ApiCategoryKey, type ApiQuestion } from '@/shared/api';
 import {
   Badge,
   Banner,
@@ -19,6 +13,14 @@ import {
 } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { categoryColor, categoryMeta } from '@/shared/theme/colors';
+import {
+  MAX_CHOICES,
+  MIN_CHOICES,
+  toQuestionRequest,
+  toQuizDraft,
+  validateQuizDraft,
+  type QuizDraft,
+} from './quiz-draft';
 
 /**
  * The quiz authoring screen.
@@ -32,81 +34,6 @@ import { categoryColor, categoryMeta } from '@/shared/theme/colors';
  */
 const LEVELS = [1, 2, 3, 4, 5];
 const ACTIVITIES = [1, 2, 3, 4, 5, 6];
-const MIN_CHOICES = 2;
-const MAX_CHOICES = 8;
-
-/** The editor's working copy — the API shape with the two variants flattened. */
-interface Draft {
-  type: 'multiple-choice' | 'enumeration';
-  question: string;
-  hint: string;
-  explanation: string;
-  choices: string[];
-  correctAnswer: string;
-  answerPool: string[];
-  requiredAnswers: number;
-}
-
-function toDraft(q: ApiQuestion): Draft {
-  const choices = q.choices?.length ? [...q.choices] : ['', ''];
-  return {
-    type: q.type,
-    question: q.question ?? '',
-    hint: q.hint ?? '',
-    explanation: q.explanation ?? '',
-    choices,
-    correctAnswer: q.correctAnswer ?? '',
-    answerPool: q.answerPool ? [...q.answerPool] : [],
-    requiredAnswers: q.requiredAnswers ?? 3,
-  };
-}
-
-/** Mirrors juanwise-be `content.schema.ts` so a save is not spent on a 422. */
-function validate(draft: Draft): string | null {
-  if (!draft.question.trim()) return 'Write the question first.';
-
-  if (draft.type === 'multiple-choice') {
-    const choices = draft.choices.map((c) => c.trim()).filter(Boolean);
-    if (choices.length < MIN_CHOICES) return `Give at least ${MIN_CHOICES} choices.`;
-    if (choices.length > MAX_CHOICES) return `Give at most ${MAX_CHOICES} choices.`;
-    if (new Set(choices).size !== choices.length) return 'Two choices are identical.';
-    if (!draft.correctAnswer.trim()) return 'Mark which choice is the correct answer.';
-    if (!choices.includes(draft.correctAnswer.trim()))
-      return 'The correct answer must be one of the choices.';
-    return null;
-  }
-
-  const pool = draft.answerPool.map((a) => a.trim()).filter(Boolean);
-  if (pool.length < 10) return 'Enumeration needs an answer pool of at least 10 entries.';
-  if (draft.requiredAnswers < 1) return 'Required answers must be at least 1.';
-  if (draft.requiredAnswers > pool.length)
-    return 'Required answers cannot exceed the size of the answer pool.';
-  return null;
-}
-
-function toRequest(draft: Draft): UpsertQuestionRequest {
-  const common = {
-    question: draft.question.trim(),
-    hint: draft.hint.trim() || null,
-    explanation: draft.explanation.trim() || null,
-  };
-
-  if (draft.type === 'enumeration') {
-    return {
-      ...common,
-      type: 'enumeration',
-      answerPool: draft.answerPool.map((a) => a.trim()).filter(Boolean),
-      requiredAnswers: draft.requiredAnswers,
-    };
-  }
-
-  return {
-    ...common,
-    type: 'multiple-choice',
-    choices: draft.choices.map((c) => c.trim()).filter(Boolean),
-    correctAnswer: draft.correctAnswer.trim(),
-  };
-}
 
 export default function QuizScreen() {
   const [category, setCategory] = useState<ApiCategoryKey>('history');
@@ -223,7 +150,7 @@ function QuestionEditor({
   activityNum: number;
   onSaved: () => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(question));
+  const [draft, setDraft] = useState<QuizDraft>(() => toQuizDraft(question));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState<'save' | 'revert' | null>(null);
@@ -231,10 +158,10 @@ function QuestionEditor({
   // A different slot mounts a fresh editor (`key` on the element), but the same
   // slot reloading after a save should pick up what the server stored.
   useEffect(() => {
-    setDraft(toDraft(question));
+    setDraft(toQuizDraft(question));
   }, [question]);
 
-  const patch = (next: Partial<Draft>) => {
+  const patch = (next: Partial<QuizDraft>) => {
     setDraft((current) => ({ ...current, ...next }));
     setSaved(false);
     setError(null);
@@ -259,7 +186,7 @@ function QuestionEditor({
   };
 
   const save = async () => {
-    const problem = validate(draft);
+    const problem = validateQuizDraft(draft);
     if (problem) {
       setError(problem);
       return;
@@ -268,7 +195,7 @@ function QuestionEditor({
     setBusy('save');
     setError(null);
     try {
-      await contentApi.upsertQuestion(category, level, activityNum, toRequest(draft));
+      await contentApi.upsertQuestion(category, level, activityNum, toQuestionRequest(draft));
       setSaved(true);
       onSaved();
     } catch (err) {
@@ -324,7 +251,7 @@ function QuestionEditor({
         <Field label="Question type" hint="The game renders these two; nothing else has a server form.">
           <Select
             value={draft.type}
-            onChange={(e) => patch({ type: e.target.value as Draft['type'] })}
+            onChange={(e) => patch({ type: e.target.value as QuizDraft['type'] })}
             style={{ width: 240 }}
           >
             <option value="multiple-choice">Multiple choice</option>

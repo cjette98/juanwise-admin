@@ -21,8 +21,7 @@ export type ApiActivityType = 'quiz' | 'jigsaw';
 export type ApiMedal = 'gold' | 'silver' | 'bronze' | 'none';
 export type ApiTrophy = 'gold' | 'silver' | 'bronze' | 'none';
 export type ApiPace = 'fast' | 'average' | 'slow' | 'none';
-/** The API stores only these two; the app's local `identification` has no server form. */
-export type ApiQuestionType = 'multiple-choice' | 'enumeration';
+export type ApiQuestionType = 'multiple-choice' | 'enumeration' | 'identification';
 
 export interface Page<T> {
   items: T[];
@@ -190,9 +189,16 @@ export interface ApiQuestion {
   hint: string | null;
   explanation: string | null;
   choices: string[] | null;
+  /** multiple-choice and identification — the single primary answer. */
   correctAnswer: string | null;
   answerPool: string[] | null;
   requiredAnswers: number | null;
+  /**
+   * identification only — extra spellings graded as correct alongside
+   * `correctAnswer`. Null on any document written before identification
+   * existed, which reads as "no alternatives".
+   */
+  acceptedAnswers: string[] | null;
   /** `false` when this is the seeded default rather than an admin edit. */
   isOverride: boolean;
   updatedBy: string | null;
@@ -216,6 +222,20 @@ export type UpsertQuestionRequest =
       /** At least 10 entries — enforced server-side. */
       answerPool: string[];
       requiredAnswers: number;
+    }
+  | {
+      type: 'identification';
+      question: string;
+      hint?: string | null;
+      explanation?: string | null;
+      /** The primary answer. Required. */
+      correctAnswer: string;
+      /**
+       * Alternatives only, never the primary answer again. At most 20, each at
+       * most 200 characters, all distinct from one another and from
+       * `correctAnswer` after trim/collapse/lowercase — enforced server-side.
+       */
+      acceptedAnswers?: string[];
     };
 
 export interface ApiContentSettings {

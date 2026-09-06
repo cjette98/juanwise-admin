@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+// `vitest/config` re-exports vite's defineConfig with the `test` block typed.
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
@@ -10,4 +11,9 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: { port: 5180 },
+  test: {
+    // Scoped to TypeScript so the repo's `node:test` .mjs files are left to
+    // `node --test` rather than being collected as empty vitest suites.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  },
 });
