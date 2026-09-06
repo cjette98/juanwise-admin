@@ -590,13 +590,20 @@ function QuestionEditor({
               src={draft.miniLessonImageUrl}
               alt=""
               style={{
-                width: '100%', maxHeight: 220, objectFit: 'cover',
+                // A square preview rather than a full-width strip: the picture
+                // is shown beside the write-up, not as a banner, and a 2000x220
+                // letterbox cropped every portrait down to a slice of a face.
+                width: '100%', maxWidth: 300, aspectRatio: '1 / 1', objectFit: 'cover',
                 borderRadius: 10, border: '1px solid var(--line, #e2e2e2)',
               }}
             />
           ) : (
             <div
               style={{
+                // Same box as the preview, so uploading or removing a picture
+                // does not shift everything below it.
+                width: '100%', maxWidth: 300, aspectRatio: '1 / 1',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '20px 16px', borderRadius: 10, textAlign: 'center',
                 border: '1px dashed var(--line, #d9d9d9)', color: 'var(--muted, #767676)',
                 fontSize: 13,
