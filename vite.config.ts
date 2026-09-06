@@ -15,5 +15,7 @@ export default defineConfig({
     // Scoped to TypeScript so the repo's `node:test` .mjs files are left to
     // `node --test` rather than being collected as empty vitest suites.
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
   },
 });

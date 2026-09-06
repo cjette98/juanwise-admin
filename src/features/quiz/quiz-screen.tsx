@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { contentApi, errorMessage, type ApiCategoryKey, type ApiQuestion } from '@/shared/api';
+import {
+  contentApi,
+  errorMessage,
+  type ApiCategoryKey,
+  type ApiQuestion,
+  type ApiQuestionType,
+} from '@/shared/api';
 import {
   Badge,
   Banner,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Input,
   Loading,
@@ -16,6 +23,8 @@ import { categoryColor, categoryMeta } from '@/shared/theme/colors';
 import {
   MAX_CHOICES,
   MIN_CHOICES,
+  hasAnswerContent,
+  switchQuestionType,
   toQuestionRequest,
   toQuizDraft,
   validateQuizDraft,
@@ -34,6 +43,36 @@ import {
  */
 const LEVELS = [1, 2, 3, 4, 5];
 const ACTIVITIES = [1, 2, 3, 4, 5, 6];
+
+const TYPE_LABELS: Record<ApiQuestionType, string> = {
+  'multiple-choice': 'Multiple choice',
+  enumeration: 'Enumeration',
+  identification: 'Identification',
+};
+
+/**
+ * Names the answer content a type change would discard, so the warning says
+ * what is actually at stake rather than "your answers".
+ */
+function answerContentSummary(draft: QuizDraft): string {
+  if (draft.type === 'multiple-choice') {
+    const choices = draft.choices.filter((c) => c.trim()).length;
+    const marked = draft.correctAnswer.trim() ? ' and the answer you marked correct' : '';
+    return `${choices} ${choices === 1 ? 'choice' : 'choices'}${marked}`;
+  }
+
+  if (draft.type === 'identification') {
+    const alternatives = draft.acceptedAnswers.filter((a) => a.trim()).length;
+    const primary = draft.correctAnswer.trim() ? 'the correct answer' : '';
+    const extra = alternatives
+      ? `${alternatives} other accepted ${alternatives === 1 ? 'answer' : 'answers'}`
+      : '';
+    return [primary, extra].filter(Boolean).join(' and ');
+  }
+
+  const pool = draft.answerPool.filter((a) => a.trim()).length;
+  return `an answer pool of ${pool} ${pool === 1 ? 'entry' : 'entries'}`;
+}
 
 export default function QuizScreen() {
   const [category, setCategory] = useState<ApiCategoryKey>('history');
@@ -154,6 +193,8 @@ function QuestionEditor({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState<'save' | 'revert' | null>(null);
+  // The type the admin picked but has not confirmed losing their answers for.
+  const [pendingType, setPendingType] = useState<ApiQuestionType | null>(null);
 
   // A different slot mounts a fresh editor (`key` on the element), but the same
   // slot reloading after a save should pick up what the server stored.
@@ -165,6 +206,21 @@ function QuestionEditor({
     setDraft((current) => ({ ...current, ...next }));
     setSaved(false);
     setError(null);
+  };
+
+  /**
+   * Switching type clears the previous type's answers, so it only happens
+   * silently when there is nothing to lose.
+   */
+  const requestType = (nextType: ApiQuestionType) => {
+    if (nextType === draft.type) return;
+    if (hasAnswerContent(draft)) setPendingType(nextType);
+    else patch(switchQuestionType(draft, nextType));
+  };
+
+  const confirmTypeChange = () => {
+    if (pendingType) patch(switchQuestionType(draft, pendingType));
+    setPendingType(null);
   };
 
   const setChoice = (index: number, value: string) => {
@@ -248,10 +304,26 @@ function QuestionEditor({
         {error && <Banner tone="error">{error}</Banner>}
         {saved && !error && <Banner tone="success">Saved. Every player sees this now.</Banner>}
 
+        <ConfirmDialog
+          open={pendingType !== null}
+          title={`Change to ${pendingType ? TYPE_LABELS[pendingType] : ''}?`}
+          confirmLabel="Change and clear answers"
+          cancelLabel={`Keep ${TYPE_LABELS[draft.type]}`}
+          danger
+          onConfirm={confirmTypeChange}
+          onCancel={() => setPendingType(null)}
+        >
+          <p>Your question, hint, and explanation will stay.</p>
+          <p className="dialog__warning">
+            This removes {answerContentSummary(draft)}. Nothing is saved until you choose Save
+            changes.
+          </p>
+        </ConfirmDialog>
+
         <Field label="Question type" hint="The game renders these two; nothing else has a server form.">
           <Select
             value={draft.type}
-            onChange={(e) => patch({ type: e.target.value as QuizDraft['type'] })}
+            onChange={(e) => requestType(e.target.value as ApiQuestionType)}
             style={{ width: 240 }}
           >
             <option value="multiple-choice">Multiple choice</option>
