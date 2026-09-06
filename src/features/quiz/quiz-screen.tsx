@@ -4,13 +4,14 @@ import {
   errorMessage,
   type ApiCategoryKey,
   type ApiQuestion,
-  type UpsertQuestionRequest,
+  type ApiQuestionType,
 } from '@/shared/api';
 import {
   Badge,
   Banner,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Input,
   Loading,
@@ -19,6 +20,17 @@ import {
 } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { categoryColor, categoryMeta } from '@/shared/theme/colors';
+import {
+  MAX_ACCEPTED_ANSWERS,
+  MAX_CHOICES,
+  MIN_CHOICES,
+  hasAnswerContent,
+  switchQuestionType,
+  toQuestionRequest,
+  toQuizDraft,
+  validateQuizDraft,
+  type QuizDraft,
+} from './quiz-draft';
 
 /**
  * The quiz authoring screen.
@@ -32,80 +44,50 @@ import { categoryColor, categoryMeta } from '@/shared/theme/colors';
  */
 const LEVELS = [1, 2, 3, 4, 5];
 const ACTIVITIES = [1, 2, 3, 4, 5, 6];
-const MIN_CHOICES = 2;
-const MAX_CHOICES = 8;
 
-/** The editor's working copy — the API shape with the two variants flattened. */
-interface Draft {
-  type: 'multiple-choice' | 'enumeration';
-  question: string;
-  hint: string;
-  explanation: string;
-  choices: string[];
-  correctAnswer: string;
-  answerPool: string[];
-  requiredAnswers: number;
-}
+const QUESTION_TYPES: { key: ApiQuestionType; label: string; description: string }[] = [
+  { key: 'multiple-choice', label: 'Multiple choice', description: 'Students choose one correct answer.' },
+  { key: 'enumeration', label: 'Enumeration', description: 'Students supply several answers.' },
+  { key: 'identification', label: 'Identification', description: 'Students type one answer.' },
+];
 
-function toDraft(q: ApiQuestion): Draft {
-  const choices = q.choices?.length ? [...q.choices] : ['', ''];
-  return {
-    type: q.type,
-    question: q.question ?? '',
-    hint: q.hint ?? '',
-    explanation: q.explanation ?? '',
-    choices,
-    correctAnswer: q.correctAnswer ?? '',
-    answerPool: q.answerPool ? [...q.answerPool] : [],
-    requiredAnswers: q.requiredAnswers ?? 3,
-  };
-}
+const TYPE_LABELS: Record<ApiQuestionType, string> = {
+  'multiple-choice': 'Multiple choice',
+  enumeration: 'Enumeration',
+  identification: 'Identification',
+};
 
-/** Mirrors juanwise-be `content.schema.ts` so a save is not spent on a 422. */
-function validate(draft: Draft): string | null {
-  if (!draft.question.trim()) return 'Write the question first.';
+const ANSWER_HINTS: Record<ApiQuestionType, string> = {
+  'multiple-choice': 'Click a circle to mark the correct answer. Two to eight choices.',
+  enumeration: 'The game shows a subset of the pool and asks for the required number of answers.',
+  identification: 'Capitalization and extra spaces are ignored.',
+};
 
+const replaceAt = (values: string[], index: number, value: string) =>
+  values.map((current, i) => (i === index ? value : current));
+
+/**
+ * Names the answer content a type change would discard, so the warning says
+ * what is actually at stake rather than "your answers".
+ */
+function answerContentSummary(draft: QuizDraft): string {
   if (draft.type === 'multiple-choice') {
-    const choices = draft.choices.map((c) => c.trim()).filter(Boolean);
-    if (choices.length < MIN_CHOICES) return `Give at least ${MIN_CHOICES} choices.`;
-    if (choices.length > MAX_CHOICES) return `Give at most ${MAX_CHOICES} choices.`;
-    if (new Set(choices).size !== choices.length) return 'Two choices are identical.';
-    if (!draft.correctAnswer.trim()) return 'Mark which choice is the correct answer.';
-    if (!choices.includes(draft.correctAnswer.trim()))
-      return 'The correct answer must be one of the choices.';
-    return null;
+    const choices = draft.choices.filter((c) => c.trim()).length;
+    const marked = draft.correctAnswer.trim() ? ' and the answer you marked correct' : '';
+    return `${choices} ${choices === 1 ? 'choice' : 'choices'}${marked}`;
   }
 
-  const pool = draft.answerPool.map((a) => a.trim()).filter(Boolean);
-  if (pool.length < 10) return 'Enumeration needs an answer pool of at least 10 entries.';
-  if (draft.requiredAnswers < 1) return 'Required answers must be at least 1.';
-  if (draft.requiredAnswers > pool.length)
-    return 'Required answers cannot exceed the size of the answer pool.';
-  return null;
-}
-
-function toRequest(draft: Draft): UpsertQuestionRequest {
-  const common = {
-    question: draft.question.trim(),
-    hint: draft.hint.trim() || null,
-    explanation: draft.explanation.trim() || null,
-  };
-
-  if (draft.type === 'enumeration') {
-    return {
-      ...common,
-      type: 'enumeration',
-      answerPool: draft.answerPool.map((a) => a.trim()).filter(Boolean),
-      requiredAnswers: draft.requiredAnswers,
-    };
+  if (draft.type === 'identification') {
+    const alternatives = draft.acceptedAnswers.filter((a) => a.trim()).length;
+    const primary = draft.correctAnswer.trim() ? 'the correct answer' : '';
+    const extra = alternatives
+      ? `${alternatives} other accepted ${alternatives === 1 ? 'answer' : 'answers'}`
+      : '';
+    return [primary, extra].filter(Boolean).join(' and ');
   }
 
-  return {
-    ...common,
-    type: 'multiple-choice',
-    choices: draft.choices.map((c) => c.trim()).filter(Boolean),
-    correctAnswer: draft.correctAnswer.trim(),
-  };
+  const pool = draft.answerPool.filter((a) => a.trim()).length;
+  return `an answer pool of ${pool} ${pool === 1 ? 'entry' : 'entries'}`;
 }
 
 export default function QuizScreen() {
@@ -223,21 +205,41 @@ function QuestionEditor({
   activityNum: number;
   onSaved: () => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(question));
+  const [draft, setDraft] = useState<QuizDraft>(() => toQuizDraft(question));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState<'save' | 'revert' | null>(null);
+  // The type the admin picked but has not confirmed losing their answers for.
+  const [pendingType, setPendingType] = useState<ApiQuestionType | null>(null);
+  // The category colour marks the selected card only. Actions stay JuanWise
+  // blue, so "which type is this" and "what can I press" read differently.
+  const accent = categoryColor(category);
 
   // A different slot mounts a fresh editor (`key` on the element), but the same
   // slot reloading after a save should pick up what the server stored.
   useEffect(() => {
-    setDraft(toDraft(question));
+    setDraft(toQuizDraft(question));
   }, [question]);
 
-  const patch = (next: Partial<Draft>) => {
+  const patch = (next: Partial<QuizDraft>) => {
     setDraft((current) => ({ ...current, ...next }));
     setSaved(false);
     setError(null);
+  };
+
+  /**
+   * Switching type clears the previous type's answers, so it only happens
+   * silently when there is nothing to lose.
+   */
+  const requestType = (nextType: ApiQuestionType) => {
+    if (nextType === draft.type) return;
+    if (hasAnswerContent(draft)) setPendingType(nextType);
+    else patch(switchQuestionType(draft, nextType));
+  };
+
+  const confirmTypeChange = () => {
+    if (pendingType) patch(switchQuestionType(draft, pendingType));
+    setPendingType(null);
   };
 
   const setChoice = (index: number, value: string) => {
@@ -259,7 +261,7 @@ function QuestionEditor({
   };
 
   const save = async () => {
-    const problem = validate(draft);
+    const problem = validateQuizDraft(draft);
     if (problem) {
       setError(problem);
       return;
@@ -268,7 +270,7 @@ function QuestionEditor({
     setBusy('save');
     setError(null);
     try {
-      await contentApi.upsertQuestion(category, level, activityNum, toRequest(draft));
+      await contentApi.upsertQuestion(category, level, activityNum, toQuestionRequest(draft));
       setSaved(true);
       onSaved();
     } catch (err) {
@@ -312,7 +314,7 @@ function QuestionEditor({
             </Button>
           )}
           <Button onClick={save} busy={busy === 'save'}>
-            Save
+            Save changes
           </Button>
         </>
       }
@@ -321,31 +323,64 @@ function QuestionEditor({
         {error && <Banner tone="error">{error}</Banner>}
         {saved && !error && <Banner tone="success">Saved. Every player sees this now.</Banner>}
 
-        <Field label="Question type" hint="The game renders these two; nothing else has a server form.">
-          <Select
-            value={draft.type}
-            onChange={(e) => patch({ type: e.target.value as Draft['type'] })}
-            style={{ width: 240 }}
-          >
-            <option value="multiple-choice">Multiple choice</option>
-            <option value="enumeration">Enumeration</option>
-          </Select>
-        </Field>
+        <ConfirmDialog
+          open={pendingType !== null}
+          title={`Change to ${pendingType ? TYPE_LABELS[pendingType] : ''}?`}
+          confirmLabel="Change and clear answers"
+          cancelLabel={`Keep ${TYPE_LABELS[draft.type]}`}
+          danger
+          onConfirm={confirmTypeChange}
+          onCancel={() => setPendingType(null)}
+        >
+          <p>Your question, hint, and explanation will stay.</p>
+          <p className="dialog__warning">
+            This removes {answerContentSummary(draft)}. Nothing is saved until you choose Save
+            changes.
+          </p>
+        </ConfirmDialog>
 
-        <Field label="Question">
+        <fieldset className="quiz-types">
+          <legend className="quiz-section__legend">1. Choose question type</legend>
+          <div className="quiz-types__grid">
+            {QUESTION_TYPES.map((option) => {
+              const selected = draft.type === option.key;
+              return (
+                <label
+                  key={option.key}
+                  className={`quiz-type ${selected ? 'quiz-type--selected' : ''}`}
+                  style={selected ? { borderColor: accent, boxShadow: `0 0 0 1px ${accent}` } : undefined}
+                >
+                  <input
+                    type="radio"
+                    className="quiz-type__radio"
+                    name={`question-type-${level}-${activityNum}`}
+                    value={option.key}
+                    checked={selected}
+                    onChange={() => requestType(option.key)}
+                  />
+                  <span className="quiz-type__name">{option.label}</span>
+                  <span className="quiz-type__desc">{option.description}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <section className="quiz-section">
+          <h3 className="quiz-section__legend">2. Write the question</h3>
           <Textarea
             value={draft.question}
             onChange={(e) => patch({ question: e.target.value })}
             placeholder="Sino ang itinuturing na pambansang bayani ng Pilipinas?"
             style={{ minHeight: 76 }}
           />
-        </Field>
+        </section>
 
-        {draft.type === 'multiple-choice' ? (
-          <Field
-            label="Choices"
-            hint="Click a circle to mark the correct answer. Two to eight choices."
-          >
+        <section className="quiz-section">
+          <h3 className="quiz-section__legend">3. Configure the answer</h3>
+          <p className="quiz-section__hint">{ANSWER_HINTS[draft.type]}</p>
+
+          {draft.type === 'multiple-choice' && (
             <div className="grid" style={{ gap: 8 }}>
               {draft.choices.map((choice, index) => {
                 const isCorrect = choice.trim() !== '' && choice === draft.correctAnswer;
@@ -393,31 +428,89 @@ function QuestionEditor({
                 </Button>
               </div>
             </div>
-          </Field>
-        ) : (
-          <>
-            <Field
-              label="Answer pool"
-              hint="One answer per line. At least 10 — the game shows a subset of these."
-            >
-              <Textarea
-                value={draft.answerPool.join('\n')}
-                onChange={(e) => patch({ answerPool: e.target.value.split('\n') })}
-                placeholder={'Luzon\nVisayas\nMindanao\n…'}
-                style={{ minHeight: 160 }}
-              />
-            </Field>
-            <Field label="Required answers" hint="How many the student must get for a pass.">
-              <Input
-                type="number"
-                min={1}
-                value={draft.requiredAnswers}
-                onChange={(e) => patch({ requiredAnswers: Number(e.target.value) })}
-                style={{ width: 120 }}
-              />
-            </Field>
-          </>
-        )}
+          )}
+
+          {draft.type === 'identification' && (
+            <div className="grid" style={{ gap: 14 }}>
+              <Field label="Correct answer">
+                <Input
+                  value={draft.correctAnswer}
+                  onChange={(e) => patch({ correctAnswer: e.target.value })}
+                  placeholder="Andrés Bonifacio"
+                />
+              </Field>
+
+              <Field
+                label="Other accepted answers"
+                hint="Optional. Add a row for each spelling that should also pass."
+              >
+                <div className="grid" style={{ gap: 8 }}>
+                  {draft.acceptedAnswers.map((answer, index) => (
+                    <div className="choice" key={index}>
+                      <Input
+                        value={answer}
+                        onChange={(e) => patch({ acceptedAnswers: replaceAt(draft.acceptedAnswers, index, e.target.value) })}
+                        placeholder="Andres Bonifacio"
+                      />
+                      <Button
+                        variant="ghost"
+                        small
+                        onClick={() =>
+                          patch({ acceptedAnswers: draft.acceptedAnswers.filter((_, i) => i !== index) })
+                        }
+                        title="Remove this accepted answer"
+                        aria-label={`Remove accepted answer ${index + 1}`}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ))}
+
+                  <div>
+                    <Button
+                      variant="secondary"
+                      small
+                      onClick={() => patch({ acceptedAnswers: [...draft.acceptedAnswers, ''] })}
+                      disabled={draft.acceptedAnswers.length >= MAX_ACCEPTED_ANSWERS}
+                      title={
+                        draft.acceptedAnswers.length >= MAX_ACCEPTED_ANSWERS
+                          ? `At most ${MAX_ACCEPTED_ANSWERS} other accepted answers`
+                          : undefined
+                      }
+                    >
+                      + Add accepted answer
+                    </Button>
+                  </div>
+                </div>
+              </Field>
+            </div>
+          )}
+
+          {draft.type === 'enumeration' && (
+            <div className="grid" style={{ gap: 14 }}>
+              <Field
+                label="Answer pool"
+                hint="One answer per line. At least 10 — the game shows a subset of these."
+              >
+                <Textarea
+                  value={draft.answerPool.join('\n')}
+                  onChange={(e) => patch({ answerPool: e.target.value.split('\n') })}
+                  placeholder={'Luzon\nVisayas\nMindanao\n…'}
+                  style={{ minHeight: 160 }}
+                />
+              </Field>
+              <Field label="Required answers" hint="How many the student must get for a pass.">
+                <Input
+                  type="number"
+                  min={1}
+                  value={draft.requiredAnswers}
+                  onChange={(e) => patch({ requiredAnswers: Number(e.target.value) })}
+                  style={{ width: 120 }}
+                />
+              </Field>
+            </div>
+          )}
+        </section>
 
         <div className="grid grid--2">
           <Field label="Hint" hint="Shown when the player asks for help. Optional.">

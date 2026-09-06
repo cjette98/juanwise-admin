@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 /**
@@ -234,4 +234,76 @@ export function Empty({
 /** 1st/2nd/3rd get the medal colours the game already uses. */
 export function Rank({ rank }: { rank: number }) {
   return <span className={`rank ${rank <= 3 ? `rank--${rank}` : ''}`}>{rank}</span>;
+}
+
+/* ---------------------------------------------------------- confirm dialog */
+
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  cancelLabel: string;
+  /** Styles the confirm action as destructive and keeps focus on the safe one. */
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/**
+ * A modal confirmation built on the native `<dialog>` element, which brings
+ * focus trapping, the top layer and Escape-to-close without a focus-management
+ * library.
+ *
+ * The element is always rendered and opened imperatively — `showModal()` is the
+ * only way to get the modal behaviour, and React has no prop for it.
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  children,
+  confirmLabel,
+  cancelLabel,
+  danger,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    // Guarded both ways: showModal() on an open dialog throws, and close() on a
+    // closed one fires a spurious `close` event.
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={ref}
+      className="dialog"
+      aria-labelledby={titleId}
+      // Escape fires `cancel`, which would close the element while the caller
+      // still thinks it is open. Handle it as a cancel instead.
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+    >
+      <h2 className="dialog__title" id={titleId}>
+        {title}
+      </h2>
+      <div className="dialog__body">{children}</div>
+      <div className="dialog__actions">
+        <Button variant="secondary" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </dialog>
+  );
 }

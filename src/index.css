@@ -1050,3 +1050,150 @@ textarea {
 .pill-tab--active:hover {
   color: #fff;
 }
+
+/* ------------------------------------------------------------ confirm dialog */
+
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.dialog::backdrop {
+  background: rgba(16, 24, 40, 0.45);
+}
+
+.dialog__title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.dialog__body {
+  margin: 0;
+  color: var(--muted);
+}
+
+.dialog__body p {
+  margin: 0 0 10px;
+}
+
+/* Names the answer data about to be discarded — the one thing in the dialog a
+   reader must not skim past. */
+.dialog__warning {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--red-tint);
+  color: var(--ink);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+@media (max-width: 520px) {
+  .dialog__actions {
+    flex-direction: column-reverse;
+  }
+}
+
+/* --------------------------------------------------------------- quiz editor */
+
+/* The numbered sections are a reading order, not boxes — a rule and a quiet
+   label are enough to group them without nesting cards inside a card. */
+.quiz-section,
+.quiz-types {
+  margin: 0;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.quiz-section__legend {
+  margin: 0 0 4px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.quiz-section__hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.quiz-types__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .quiz-types__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quiz-type {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'radio name'
+    '.     desc';
+  align-items: center;
+  gap: 2px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.quiz-type:hover {
+  background: var(--canvas);
+}
+
+.quiz-type--selected {
+  background: var(--canvas);
+}
+
+/* A real radio, sized up and placed in the card, so the group keeps its native
+   keyboard behaviour — arrow keys move between types. */
+.quiz-type__radio {
+  grid-area: radio;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+/* The ring belongs on the card, not the 16px control inside it. */
+.quiz-type:has(.quiz-type__radio:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.quiz-type__name {
+  grid-area: name;
+  font-weight: 600;
+}
+
+.quiz-type__desc {
+  grid-area: desc;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
