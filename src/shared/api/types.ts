@@ -194,6 +194,12 @@ export interface ApiQuestion {
    * falls back to `explanation` for.
    */
   miniLesson: string | null;
+  /**
+   * Picture shown beside the mini-lesson in the game. Null on any question
+   * stored before the field existed, and on any nobody has illustrated — the
+   * game then falls back to the category image.
+   */
+  miniLessonImageUrl: string | null;
   choices: string[] | null;
   /** multiple-choice and identification — the single primary answer. */
   correctAnswer: string | null;
@@ -218,6 +224,7 @@ export type UpsertQuestionRequest =
       hint?: string | null;
       explanation?: string | null;
       miniLesson?: string | null;
+      miniLessonImageUrl?: string | null;
       choices: string[];
       correctAnswer: string;
     }
@@ -227,6 +234,7 @@ export type UpsertQuestionRequest =
       hint?: string | null;
       explanation?: string | null;
       miniLesson?: string | null;
+      miniLessonImageUrl?: string | null;
       /** At least 10 entries — enforced server-side. */
       answerPool: string[];
       requiredAnswers: number;
@@ -237,6 +245,7 @@ export type UpsertQuestionRequest =
       hint?: string | null;
       explanation?: string | null;
       miniLesson?: string | null;
+      miniLessonImageUrl?: string | null;
       /** The primary answer. Required. */
       correctAnswer: string;
       /**
@@ -294,7 +303,7 @@ export interface AnalyticsFilter {
 /* ------------------------------------------------------------------- media */
 
 export interface UploadUrlRequest {
-  purpose: 'profile-photo' | 'category-image';
+  purpose: 'profile-photo' | 'category-image' | 'question-image';
   contentType: 'image/jpeg' | 'image/png' | 'image/webp';
   categoryKey?: string;
 }

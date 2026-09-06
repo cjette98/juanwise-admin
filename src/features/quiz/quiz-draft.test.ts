@@ -15,6 +15,7 @@ const draft = (over: Partial<QuizDraft> = {}): QuizDraft => ({
   hint: '',
   explanation: '',
   miniLesson: '',
+  miniLessonImageUrl: '',
   choices: ['', ''],
   correctAnswer: '',
   answerPool: [],
@@ -50,6 +51,7 @@ describe('toQuestionRequest', () => {
       hint: null,
       explanation: null,
       miniLesson: null,
+      miniLessonImageUrl: null,
       correctAnswer: 'Andrés Bonifacio',
       acceptedAnswers: ['Andres Bonifacio', 'Bonifacio'],
     });
@@ -69,6 +71,7 @@ describe('toQuestionRequest', () => {
       hint: 'Founded in 1892.',
       explanation: 'Bonifacio founded it.',
       miniLesson: null,
+      miniLessonImageUrl: null,
       choices: ['Andrés Bonifacio', 'José Rizal'],
       correctAnswer: 'Andrés Bonifacio',
     });
@@ -81,6 +84,7 @@ describe('toQuestionRequest', () => {
       hint: null,
       explanation: null,
       miniLesson: null,
+      miniLessonImageUrl: null,
       answerPool: enumerationDraft.answerPool,
       requiredAnswers: 3,
     });
@@ -212,6 +216,7 @@ describe('toQuizDraft', () => {
     hint: null,
     explanation: null,
     miniLesson: null,
+    miniLessonImageUrl: null,
     choices: null,
     correctAnswer: 'Andrés Bonifacio',
     answerPool: null,
@@ -277,5 +282,51 @@ describe('mini-lesson', () => {
 
   it('is not answer content, so a mini-lesson alone does not warn on type change', () => {
     expect(hasAnswerContent(draft({ miniLesson: lesson }))).toBe(false);
+  });
+});
+
+describe('mini-lesson image', () => {
+  const url = 'https://storage.googleapis.com/juanwise/question-images/history/abc.jpg';
+
+  it('reads the stored image into the draft', () => {
+    const question = {
+      type: 'multiple-choice',
+      question: 'Q',
+      miniLessonImageUrl: url,
+    } as ApiQuestion;
+    expect(toQuizDraft(question).miniLessonImageUrl).toBe(url);
+  });
+
+  it('reads a question authored before the field existed as having no image', () => {
+    const question = {
+      type: 'multiple-choice',
+      question: 'Q',
+      miniLessonImageUrl: null,
+    } as ApiQuestion;
+    expect(toQuizDraft(question).miniLessonImageUrl).toBe('');
+  });
+
+  it('sends the image on every save, so a full overwrite cannot clear it', () => {
+    expect(
+      toQuestionRequest({ ...multipleChoiceDraft, miniLessonImageUrl: url }),
+    ).toMatchObject({ miniLessonImageUrl: url });
+  });
+
+  it('sends null rather than an empty string when there is no image', () => {
+    expect(
+      toQuestionRequest({ ...multipleChoiceDraft, miniLessonImageUrl: '   ' }),
+    ).toMatchObject({ miniLessonImageUrl: null });
+  });
+
+  it('survives a type change, the way the mini-lesson text does', () => {
+    const switched = switchQuestionType(
+      { ...multipleChoiceDraft, miniLessonImageUrl: url },
+      'enumeration',
+    );
+    expect(switched.miniLessonImageUrl).toBe(url);
+  });
+
+  it('does not count as answer content a type change would destroy', () => {
+    expect(hasAnswerContent(draft({ miniLessonImageUrl: url }))).toBe(false);
   });
 });

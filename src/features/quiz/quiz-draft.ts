@@ -24,6 +24,8 @@ export interface QuizDraft {
   explanation: string;
   /** Longer write-up shown on the game's mini-lessons screen after the activity. */
   miniLesson: string;
+  /** Picture shown beside that write-up. Empty string means "no picture". */
+  miniLessonImageUrl: string;
   /** multiple-choice */
   choices: string[];
   /** multiple-choice and identification both store their answer here. */
@@ -59,6 +61,7 @@ export function toQuizDraft(q: ApiQuestion): QuizDraft {
     explanation: q.explanation ?? '',
     // Null on any question stored before mini-lessons existed.
     miniLesson: q.miniLesson ?? '',
+    miniLessonImageUrl: q.miniLessonImageUrl ?? '',
     choices: q.choices?.length ? [...q.choices] : ['', ''],
     correctAnswer: q.correctAnswer ?? '',
     answerPool: q.answerPool ? [...q.answerPool] : [],
@@ -119,8 +122,10 @@ export function toQuestionRequest(draft: QuizDraft): UpsertQuestionRequest {
     hint: draft.hint.trim() || null,
     explanation: draft.explanation.trim() || null,
     // Shared by all three types: the mini-lesson teaches the topic, so it is
-    // not answer data and does not belong to any one type.
+    // not answer data and does not belong to any one type. The picture that
+    // illustrates it is sent on the same terms.
     miniLesson: draft.miniLesson.trim() || null,
+    miniLessonImageUrl: draft.miniLessonImageUrl.trim() || null,
   };
 
   if (draft.type === 'enumeration') {
@@ -167,8 +172,8 @@ export function hasAnswerContent(draft: QuizDraft): boolean {
 }
 
 /**
- * Changes the type, keeping Question, Hint and Explanation and resetting every
- * answer field.
+ * Changes the type, keeping Question, Hint, Explanation and the mini-lesson
+ * (text and picture) and resetting every answer field.
  *
  * All of them are reset, not just the ones the old type owned — `correctAnswer`
  * is shared between multiple-choice and identification, so carrying it across
@@ -182,5 +187,6 @@ export function switchQuestionType(draft: QuizDraft, nextType: ApiQuestionType):
     hint: draft.hint,
     explanation: draft.explanation,
     miniLesson: draft.miniLesson,
+    miniLessonImageUrl: draft.miniLessonImageUrl,
   };
 }
