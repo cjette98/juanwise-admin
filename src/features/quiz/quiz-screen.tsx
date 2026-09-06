@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   contentApi,
   errorMessage,
+  mediaApi,
   type ApiCategoryKey,
   type ApiQuestion,
   type ApiQuestionType,
@@ -211,6 +212,8 @@ function QuestionEditor({
   const [busy, setBusy] = useState<'save' | 'revert' | null>(null);
   // The type the admin picked but has not confirmed losing their answers for.
   const [pendingType, setPendingType] = useState<ApiQuestionType | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const pictureInput = useRef<HTMLInputElement>(null);
   // The category colour marks the selected card only. Actions stay JuanWise
   // blue, so "which type is this" and "what can I press" read differently.
   const accent = categoryColor(category);
@@ -220,6 +223,27 @@ function QuestionEditor({
   useEffect(() => {
     setDraft(toQuizDraft(question));
   }, [question]);
+
+  /**
+   * The file goes straight to Cloud Storage with a signed URL; only the public
+   * URL lands in the draft. Nothing reaches the question until Save, so backing
+   * out leaves the published activity untouched.
+   */
+  const uploadPicture = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await mediaApi.upload(file, 'question-image', { categoryKey: category });
+      patch({ miniLessonImageUrl: url });
+    } catch (err) {
+      setError(errorMessage(err, 'Could not upload the picture.'));
+    } finally {
+      setUploading(false);
+      // Clear the input so re-picking the same file fires `change` again.
+      if (pictureInput.current) pictureInput.current.value = '';
+    }
+  };
 
   const patch = (next: Partial<QuizDraft>) => {
     setDraft((current) => ({ ...current, ...next }));
@@ -546,6 +570,70 @@ function QuestionEditor({
             placeholder="Ang Katipunan ay lihim na samahang itinatag ni Andres Bonifacio noong Hulyo 7, 1892 sa Tondo, Maynila..."
           />
         </Field>
+
+        {/*
+          Not wrapped in <Field>, which renders a <label>: a click anywhere
+          inside one would reach the hidden file input, so the Remove button
+          would re-open the picker on its way to clearing the picture.
+        */}
+        <div className="field">
+          <span className="field__label">Mini-lesson picture</span>
+          <input
+            ref={pictureInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={(e) => void uploadPicture(e.target.files?.[0])}
+          />
+          {draft.miniLessonImageUrl ? (
+            <img
+              src={draft.miniLessonImageUrl}
+              alt=""
+              style={{
+                width: '100%', maxHeight: 220, objectFit: 'cover',
+                borderRadius: 10, border: '1px solid var(--line, #e2e2e2)',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                padding: '20px 16px', borderRadius: 10, textAlign: 'center',
+                border: '1px dashed var(--line, #d9d9d9)', color: 'var(--muted, #767676)',
+                fontSize: 13,
+              }}
+            >
+              No picture — the category picture is used instead.
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <Button
+              type="button"
+              variant="secondary"
+              small
+              busy={uploading}
+              disabled={busy !== null}
+              onClick={() => pictureInput.current?.click()}
+            >
+              {draft.miniLessonImageUrl ? 'Replace picture' : 'Upload picture'}
+            </Button>
+            {draft.miniLessonImageUrl && !uploading && (
+              <Button
+                type="button"
+                variant="ghost"
+                small
+                disabled={busy !== null}
+                onClick={() => patch({ miniLessonImageUrl: '' })}
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+          <span className="field__hint">
+            Shown beside the write-up on the mini-lessons screen, after the student passes the
+            activity. It is not shown while the question is being answered, so it cannot give the
+            answer away. Optional.
+          </span>
+        </div>
       </div>
     </Card>
   );

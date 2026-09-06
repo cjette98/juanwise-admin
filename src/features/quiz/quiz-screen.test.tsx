@@ -28,6 +28,7 @@ const question = (over: Partial<ApiQuestion> = {}): ApiQuestion => ({
   question: 'Sino ang nagtatag ng Katipunan?',
   hint: 'Itinatag noong 1892.',
   explanation: 'Si Andrés Bonifacio.',
+  miniLessonImageUrl: null,
   miniLesson: null,
   choices: ['Andrés Bonifacio', 'José Rizal'],
   correctAnswer: 'Andrés Bonifacio',
@@ -165,6 +166,7 @@ describe('identification answer fields', () => {
       hint: 'Itinatag noong 1892.',
       explanation: 'Si Andrés Bonifacio.',
       miniLesson: null,
+      miniLessonImageUrl: null,
       correctAnswer: 'Andrés Bonifacio',
       acceptedAnswers: ['Andres Bonifacio'],
     });
