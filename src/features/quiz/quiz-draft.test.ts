@@ -14,6 +14,7 @@ const draft = (over: Partial<QuizDraft> = {}): QuizDraft => ({
   question: 'Who founded the Katipunan?',
   hint: '',
   explanation: '',
+  miniLesson: '',
   choices: ['', ''],
   correctAnswer: '',
   answerPool: [],
@@ -48,6 +49,7 @@ describe('toQuestionRequest', () => {
       question: 'Who founded the Katipunan?',
       hint: null,
       explanation: null,
+      miniLesson: null,
       correctAnswer: 'Andrés Bonifacio',
       acceptedAnswers: ['Andres Bonifacio', 'Bonifacio'],
     });
@@ -66,6 +68,7 @@ describe('toQuestionRequest', () => {
       question: 'Who founded the Katipunan?',
       hint: 'Founded in 1892.',
       explanation: 'Bonifacio founded it.',
+      miniLesson: null,
       choices: ['Andrés Bonifacio', 'José Rizal'],
       correctAnswer: 'Andrés Bonifacio',
     });
@@ -77,6 +80,7 @@ describe('toQuestionRequest', () => {
       question: 'Who founded the Katipunan?',
       hint: null,
       explanation: null,
+      miniLesson: null,
       answerPool: enumerationDraft.answerPool,
       requiredAnswers: 3,
     });
@@ -207,6 +211,7 @@ describe('toQuizDraft', () => {
     question: 'Q',
     hint: null,
     explanation: null,
+    miniLesson: null,
     choices: null,
     correctAnswer: 'Andrés Bonifacio',
     answerPool: null,
@@ -228,5 +233,49 @@ describe('toQuizDraft', () => {
 
   it('treats a response with no acceptedAnswers as having none', () => {
     expect(toQuizDraft(api({ acceptedAnswers: null })).acceptedAnswers).toEqual([]);
+  });
+});
+
+describe('mini-lesson', () => {
+  const lesson = 'Ang Katipunan ay lihim na samahang itinatag ni Andres Bonifacio noong 1892.';
+
+  it('loads the stored mini-lesson into the draft', () => {
+    const question = { type: 'multiple-choice', question: 'Q', miniLesson: lesson } as ApiQuestion;
+    expect(toQuizDraft(question).miniLesson).toBe(lesson);
+  });
+
+  it('reads a question stored before mini-lessons existed as an empty field', () => {
+    const question = { type: 'multiple-choice', question: 'Q', miniLesson: null } as ApiQuestion;
+    expect(toQuizDraft(question).miniLesson).toBe('');
+  });
+
+  it.each([
+    ['multiple-choice', multipleChoiceDraft],
+    ['enumeration', enumerationDraft],
+    ['identification', identificationDraft],
+  ])('sends the mini-lesson on a %s question', (_label, base) => {
+    expect(toQuestionRequest({ ...base, miniLesson: lesson })).toMatchObject({
+      miniLesson: lesson,
+    });
+  });
+
+  it('sends null rather than an empty string when there is no mini-lesson', () => {
+    expect(toQuestionRequest({ ...multipleChoiceDraft, miniLesson: '   ' })).toMatchObject({
+      miniLesson: null,
+    });
+  });
+
+  it('keeps the mini-lesson when the question type changes', () => {
+    // It teaches the topic, so it survives the switch exactly as the question,
+    // hint and explanation do — only the answer fields are reset.
+    const switched = switchQuestionType(
+      { ...multipleChoiceDraft, miniLesson: lesson },
+      'identification',
+    );
+    expect(switched.miniLesson).toBe(lesson);
+  });
+
+  it('is not answer content, so a mini-lesson alone does not warn on type change', () => {
+    expect(hasAnswerContent(draft({ miniLesson: lesson }))).toBe(false);
   });
 });
