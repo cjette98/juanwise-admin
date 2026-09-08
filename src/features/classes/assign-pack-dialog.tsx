@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { errorMessage } from '@/shared/api';
+import { errorMessage, packsApi } from '@/shared/api';
 import type { ApiClass, ApiPack, AssignPackRequest } from '@/shared/api';
 import { Banner, Button, Field, Select } from '@/shared/components/ui';
 
@@ -8,7 +8,9 @@ interface AssignPackDialogProps {
   classes: ApiClass[];
   currentClass: ApiClass;
   packs: ApiPack[];
-  onAssign: (input: AssignPackRequest) => Promise<void>;
+  /** The signed-in teacher's uid — used only to tell "my pack" from "someone else's" for the cross-teacher sharing banner. */
+  currentUserUid: string | null | undefined;
+  onAssign: (input: AssignPackRequest) => Promise<ApiClass>;
   onClose: () => void;
 }
 
@@ -28,6 +30,7 @@ export function AssignPackDialog({
   classes,
   currentClass,
   packs,
+  currentUserUid,
   onAssign,
   onClose,
 }: AssignPackDialogProps) {
@@ -73,6 +76,8 @@ export function AssignPackDialog({
       .reduce((sum, c) => sum + c.memberCount, 0);
   }, [classes, currentClass.id, packId]);
 
+  const selectedPack = useMemo(() => packs.find((p) => p.id === packId) ?? null, [packs, packId]);
+
   const cancel = () => {
     if (submitting) return;
     onClose();
@@ -89,7 +94,18 @@ export function AssignPackDialog({
       // `mode` is sent explicitly even though the server defaults to 'link' —
       // the UI's own recommendation ("Share it") and what's actually sent
       // must never drift apart.
-      await onAssign({ packId, mode });
+      const result = await onAssign({ packId, mode });
+      if (mode === 'copy' && result.packId) {
+        // The server always forks "Make a copy" as a fresh draft (version 0),
+        // which would otherwise silently fall back to the system pack for
+        // students until someone separately published it. The fork is
+        // copy-on-write identical to the source pack at this instant, so
+        // publishing it immediately is safe and makes "Make a copy" a single
+        // working step instead of a silent no-op. Left inside this same
+        // try/catch: if this fails, the class IS assigned to the (still
+        // draft) fork, so the error must surface rather than be swallowed.
+        await packsApi.publish(result.packId);
+      }
       onClose();
     } catch (err) {
       setError(errorMessage(err));
@@ -133,6 +149,21 @@ export function AssignPackDialog({
             {otherClassesWithSamePack.length === 1 ? '' : 'es'}. Sharing it here would mean{' '}
             {affectedLearners} learner{affectedLearners === 1 ? '' : 's'} across{' '}
             {otherClassesWithSamePack.length + 1} classes see the same activities.
+          </Banner>
+        )}
+
+        {selectedPack && selectedPack.status !== 'published' && (
+          <Banner tone="info">
+            This pack is still a {selectedPack.status === 'draft' ? 'draft' : 'archived'}. Students in
+            this class won't see its activities until you publish it — they'll keep playing the starter
+            set until then.
+          </Banner>
+        )}
+
+        {selectedPack && selectedPack.ownerUid !== currentUserUid && selectedPack.classCount > 0 && (
+          <Banner tone="info">
+            This pack is already used by {selectedPack.classCount} other class
+            {selectedPack.classCount === 1 ? '' : 'es'} outside the ones you handle.
           </Banner>
         )}
 

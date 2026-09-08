@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AdminLayout from '@/app/layout';
 import { AuthProvider, useAuth } from '@/features/auth/auth-context';
@@ -12,9 +13,17 @@ import StudentsScreen from '@/features/students/students-screen';
 import TeachersScreen from '@/features/teachers/teachers-screen';
 import { images } from '@/shared/assets/images';
 
+/** Redirects away from a route the signed-in role should not reach. */
+function RequireRole({ role, children }: { role: 'admin' | 'teacher'; children: ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role !== role) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 /**
- * One gate, not per-route guards: every screen here needs the admin claim, so
- * the whole router is either the console or the login page.
+ * The router mixes admin-only, teacher-only and shared routes; `RequireRole`
+ * below enforces the per-route split, and the index route additionally
+ * redirects by role since there is no single landing page both can share.
  */
 function Gate() {
   const { user, restoring } = useAuth();
@@ -37,11 +46,39 @@ function Gate() {
     <Routes>
       <Route element={<AdminLayout />}>
         <Route index element={user.role === 'admin' ? <DashboardScreen /> : <Navigate to="/packs" replace />} />
-        <Route path="/teachers" element={<TeachersScreen />} />
-        <Route path="/students" element={<StudentsScreen />} />
-        <Route path="/leaderboard" element={<LeaderboardScreen />} />
+        <Route
+          path="/teachers"
+          element={
+            <RequireRole role="admin">
+              <TeachersScreen />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/students"
+          element={
+            <RequireRole role="admin">
+              <StudentsScreen />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/leaderboard"
+          element={
+            <RequireRole role="admin">
+              <LeaderboardScreen />
+            </RequireRole>
+          }
+        />
         <Route path="/packs" element={<PackListScreen />} />
-        <Route path="/my-classes" element={<MyClassesScreen />} />
+        <Route
+          path="/my-classes"
+          element={
+            <RequireRole role="teacher">
+              <MyClassesScreen />
+            </RequireRole>
+          }
+        />
         <Route path="/packs/:packId/quiz" element={<QuizScreen />} />
         <Route path="/packs/:packId/jigsaw" element={<JigsawScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import type { ApiClass, ApiPack } from '@/shared/api';
+import type { ApiClass, ApiCurrentUser, ApiPack } from '@/shared/api';
 
 const mine = vi.fn();
 const assignPack = vi.fn();
 const clearPack = vi.fn();
 const list = vi.fn();
+const publish = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -18,9 +19,41 @@ vi.mock('@/shared/api', async (importOriginal) => ({
   },
   packsApi: {
     list: (...args: unknown[]) => list(...args),
+    publish: (...args: unknown[]) => publish(...args),
   },
   errorMessage: (err: unknown, fallback = 'error') =>
     err instanceof Error ? err.message : fallback,
+}));
+
+const currentUser: ApiCurrentUser = {
+  uid: 'teacher-1',
+  role: 'teacher',
+  name: 'Teacher One',
+  username: 'teacher1',
+  email: 'teacher1@example.com',
+  avatar: null,
+  photoUrl: null,
+  age: null,
+  grade: null,
+  section: null,
+  lrn: null,
+  teacherId: 'T-1',
+  classId: null,
+  registered: true,
+  disabled: false,
+  createdAt: null,
+  updatedAt: null,
+  claims: {},
+  emailVerified: true,
+};
+
+vi.mock('@/features/auth/auth-context', () => ({
+  useAuth: () => ({
+    user: currentUser,
+    restoring: false,
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  }),
 }));
 
 const { default: MyClassesScreen } = await import('./my-classes-screen');
@@ -135,6 +168,81 @@ describe('my classes', () => {
     await waitFor(() =>
       expect(assignPack).toHaveBeenCalledWith('class-1', { packId: 'pack-1', mode: 'copy' }),
     );
+  });
+
+  it('selecting a draft pack shows a warning that students still see the starter set', async () => {
+    const { user } = await renderScreen({
+      classes: [klass({ id: 'class-1', name: 'Grade 6 - Mabini', packId: null })],
+      packs: [pack({ id: 'pack-1', name: 'Grade 6 – Q1', status: 'draft' })],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Assign a pack' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Content pack'), 'pack-1');
+
+    expect(
+      within(dialog).getByText(/still a draft.*won't see its activities until you publish it/),
+    ).toBeInTheDocument();
+  });
+
+  it('choosing "Make a copy" publishes the newly forked pack once the assignment resolves', async () => {
+    const { user } = await renderScreen({
+      classes: [klass({ id: 'class-1', name: 'Grade 6 - Mabini', packId: null })],
+      packs: [pack({ id: 'pack-1', name: 'Grade 6 – Q1' })],
+    });
+    assignPack.mockResolvedValue(
+      klass({ id: 'class-1', packId: 'pack-1-fork', packBinding: 'copied' }),
+    );
+    publish.mockResolvedValue(pack({ id: 'pack-1-fork', status: 'published' }));
+
+    await user.click(screen.getByRole('button', { name: 'Assign a pack' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Content pack'), 'pack-1');
+    await user.click(within(dialog).getByRole('button', { name: 'Make a copy' }));
+
+    await waitFor(() => expect(publish).toHaveBeenCalledWith('pack-1-fork'));
+  });
+
+  it('shows the error and leaves the dialog open when publishing the fork fails', async () => {
+    const { user } = await renderScreen({
+      classes: [klass({ id: 'class-1', name: 'Grade 6 - Mabini', packId: null })],
+      packs: [pack({ id: 'pack-1', name: 'Grade 6 – Q1' })],
+    });
+    assignPack.mockResolvedValue(
+      klass({ id: 'class-1', packId: 'pack-1-fork', packBinding: 'copied' }),
+    );
+    publish.mockRejectedValue(new Error('Could not publish the pack.'));
+
+    await user.click(screen.getByRole('button', { name: 'Assign a pack' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Content pack'), 'pack-1');
+    await user.click(within(dialog).getByRole('button', { name: 'Make a copy' }));
+
+    expect(await within(dialog).findByText('Could not publish the pack.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it("shows a cross-teacher banner when the picked pack belongs to another teacher's classes", async () => {
+    const { user } = await renderScreen({
+      classes: [klass({ id: 'class-1', name: 'Grade 6 - Mabini', packId: null })],
+      packs: [
+        pack({
+          id: 'pack-2',
+          name: "Another teacher's pack",
+          ownerUid: 'someone-else',
+          status: 'published',
+          classCount: 5,
+        }),
+      ],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Assign a pack' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Content pack'), 'pack-2');
+
+    expect(
+      within(dialog).getByText('This pack is already used by 5 other classes outside the ones you handle.'),
+    ).toBeInTheDocument();
   });
 
   it('clearing a pack calls classesApi.clearPack', async () => {

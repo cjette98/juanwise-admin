@@ -8,6 +8,7 @@ import {
 } from '@/shared/api';
 import { Badge, Banner, Button, Card, Empty, Loading } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
+import { useAuth } from '@/features/auth/auth-context';
 import { AssignPackDialog } from './assign-pack-dialog';
 
 /**
@@ -22,6 +23,7 @@ import { AssignPackDialog } from './assign-pack-dialog';
  * shared hook the way `useDirectory` does for the admin screens.
  */
 export default function MyClassesScreen() {
+  const { user } = useAuth();
   const { data, loading, error, reload } = useAsync(
     () =>
       Promise.all([classesApi.mine(), packsApi.list()]).then(([classes, packs]) => ({
@@ -54,10 +56,11 @@ export default function MyClassesScreen() {
     }
   };
 
-  const assignPack = async (input: AssignPackRequest) => {
-    if (!assigningClass) return;
-    await classesApi.assignPack(assigningClass.id, input);
+  const assignPack = async (input: AssignPackRequest): Promise<ApiClass> => {
+    if (!assigningClass) throw new Error('No class selected.');
+    const result = await classesApi.assignPack(assigningClass.id, input);
     reload();
+    return result;
   };
 
   if (loading) return <Loading label="Loading your classes…" />;
@@ -167,6 +170,7 @@ export default function MyClassesScreen() {
           classes={classes}
           currentClass={assigningClass}
           packs={packs}
+          currentUserUid={user?.uid}
           onAssign={assignPack}
           onClose={() => setAssigningClass(null)}
         />

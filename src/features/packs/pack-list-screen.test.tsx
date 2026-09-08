@@ -45,13 +45,15 @@ const currentUser: ApiCurrentUser = {
   emailVerified: true,
 };
 
+const useAuthMock = vi.fn(() => ({
+  user: currentUser,
+  restoring: false,
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}));
+
 vi.mock('@/features/auth/auth-context', () => ({
-  useAuth: () => ({
-    user: currentUser,
-    restoring: false,
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  }),
+  useAuth: () => useAuthMock(),
 }));
 
 const { default: PackListScreen } = await import('./pack-list-screen');
@@ -86,6 +88,7 @@ const renderScreen = async (packs: ApiPack[] = [pack()]) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAuthMock.mockReturnValue({ user: currentUser, restoring: false, signIn: vi.fn(), signOut: vi.fn() });
 });
 
 describe('pack list', () => {
@@ -110,6 +113,31 @@ describe('pack list', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create pack' }));
 
     await waitFor(() => expect(create).toHaveBeenCalledWith('Brand new pack'));
+  });
+
+  it('lets an admin edit the system pack even though it is owned by someone else', async () => {
+    const admin: ApiCurrentUser = { ...currentUser, uid: 'admin-1', role: 'admin' };
+    useAuthMock.mockReturnValue({ user: admin, restoring: false, signIn: vi.fn(), signOut: vi.fn() });
+
+    await renderScreen([
+      pack({ id: 'pack-1', name: 'Starter set', ownerUid: 'someone-else', origin: 'system', status: 'published' }),
+    ]);
+
+    expect(screen.getByRole('link', { name: 'Edit quiz' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit jigsaw' })).toBeInTheDocument();
+    expect(screen.getByText('Built-in starter set')).toBeInTheDocument();
+  });
+
+  it('shows Publish for an archived owned pack so it can be restored', async () => {
+    await renderScreen([pack({ id: 'pack-1', status: 'archived' })]);
+
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
+  });
+
+  it('hides Publish for an already-published owned pack', async () => {
+    await renderScreen([pack({ id: 'pack-1', status: 'published' })]);
+
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
   });
 
   it('publishing an owned draft pack calls packsApi.publish with its id', async () => {

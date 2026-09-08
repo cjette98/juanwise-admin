@@ -126,12 +126,14 @@ export default function PackListScreen() {
             </thead>
             <tbody>
               {rows.map((pack) => {
-                const owned = pack.ownerUid === user?.uid;
+                const owned = pack.ownerUid === user?.uid || user?.role === 'admin';
                 return (
                   <tr key={pack.id}>
                     <td>
                       <div className="table__primary">{pack.name}</div>
-                      <div className="table__sub">{owned ? 'Yours' : 'By another teacher'}</div>
+                      <div className="table__sub">
+                        {pack.origin === 'system' ? 'Built-in starter set' : owned ? 'Yours' : 'By another teacher'}
+                      </div>
                     </td>
                     <td>
                       <Badge tone={STATUS_TONE[pack.status]}>{STATUS_LABEL[pack.status]}</Badge>
@@ -166,7 +168,7 @@ export default function PackListScreen() {
                         >
                           Duplicate
                         </Button>
-                        {owned && pack.status === 'draft' && (
+                        {owned && pack.status !== 'published' && (
                           <Button
                             small
                             busy={busyKey === `${pack.id}:publish`}
