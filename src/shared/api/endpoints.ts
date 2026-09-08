@@ -12,13 +12,16 @@ import type {
   ApiJigsawItem,
   ApiJigsawPieceCount,
   ApiLeaderboard,
+  ApiPack,
   ApiQuestion,
   ApiSession,
   ApiUserProfile,
+  AssignPackRequest,
   JigsawItemInput,
   ListUsersQuery,
   LoginRequest,
   Page,
+  PatchPackRequest,
   UpdateCategoryRequest,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -100,6 +103,18 @@ export const classesApi = {
     return request(`/classes/${encodeURIComponent(id)}`);
   },
 
+  mine(): Promise<ApiClass[]> {
+    return request<{ items: ApiClass[] }>('/classes/mine').then((r) => r.items);
+  },
+
+  assignPack(id: string, input: AssignPackRequest): Promise<ApiClass> {
+    return request(`/classes/${encodeURIComponent(id)}/pack`, { method: 'PUT', body: input });
+  },
+
+  clearPack(id: string): Promise<ApiClass> {
+    return request(`/classes/${encodeURIComponent(id)}/pack`, { method: 'DELETE' });
+  },
+
   members(
     id: string,
     query: { includeRemoved?: boolean; limit?: number; cursor?: string } = {},
@@ -130,17 +145,26 @@ export const classesApi = {
 /* ----------------------------------------------------------------- content */
 
 export const contentApi = {
-  async categories(): Promise<ApiCategory[]> {
-    const { items } = await request<{ items: ApiCategory[] }>('/content/categories');
+  async categories(packId: string): Promise<ApiCategory[]> {
+    const { items } = await request<{ items: ApiCategory[] }>(
+      `/packs/${encodeURIComponent(packId)}/categories`,
+    );
     return items;
   },
 
-  category(key: ApiCategoryKey): Promise<ApiCategory> {
-    return request(`/content/categories/${key}`);
+  category(packId: string, key: ApiCategoryKey): Promise<ApiCategory> {
+    return request(`/packs/${encodeURIComponent(packId)}/categories/${key}`);
   },
 
-  updateCategory(key: ApiCategoryKey, patch: UpdateCategoryRequest): Promise<ApiCategory> {
-    return request(`/content/categories/${key}`, { method: 'PUT', body: patch });
+  updateCategory(
+    packId: string,
+    key: ApiCategoryKey,
+    patch: UpdateCategoryRequest,
+  ): Promise<ApiCategory> {
+    return request(`/packs/${encodeURIComponent(packId)}/categories/${key}`, {
+      method: 'PUT',
+      body: patch,
+    });
   },
 
   /**
@@ -150,6 +174,7 @@ export const contentApi = {
    * edit.
    */
   replaceJigsaws(
+    packId: string,
     key: ApiCategoryKey,
     items: JigsawItemInput[],
     slots: Record<string, string>,
@@ -159,7 +184,7 @@ export const contentApi = {
     slots: Record<string, string>;
     pieces: Record<string, ApiJigsawPieceCount>;
   }> {
-    return request(`/content/categories/${key}/jigsaws`, {
+    return request(`/packs/${encodeURIComponent(packId)}/categories/${key}/jigsaws`, {
       method: 'PUT',
       body: { items, slots, pieces },
     });
@@ -169,34 +194,52 @@ export const contentApi = {
    * Every slot in the grid, not just admin edits — a slot with no override
    * comes back with its seeded default and `isOverride: false`.
    */
-  async questions(query: { category?: ApiCategoryKey; level?: number } = {}): Promise<ApiQuestion[]> {
-    const { items } = await request<{ items: ApiQuestion[] }>('/content/questions', { query });
+  async questions(
+    packId: string,
+    query: { category?: ApiCategoryKey; level?: number } = {},
+  ): Promise<ApiQuestion[]> {
+    const { items } = await request<{ items: ApiQuestion[] }>(
+      `/packs/${encodeURIComponent(packId)}/questions`,
+      { query },
+    );
     return items;
   },
 
-  question(category: ApiCategoryKey, level: number, activityNum: number): Promise<ApiQuestion> {
-    return request(`/content/questions/${category}/${level}/${activityNum}`);
+  question(
+    packId: string,
+    category: ApiCategoryKey,
+    level: number,
+    activityNum: number,
+  ): Promise<ApiQuestion> {
+    return request(
+      `/packs/${encodeURIComponent(packId)}/questions/${category}/${level}/${activityNum}`,
+    );
   },
 
   upsertQuestion(
+    packId: string,
     category: ApiCategoryKey,
     level: number,
     activityNum: number,
     input: UpsertQuestionRequest,
   ): Promise<ApiQuestion> {
-    return request(`/content/questions/${category}/${level}/${activityNum}`, {
-      method: 'PUT',
-      body: input,
-    });
+    return request(
+      `/packs/${encodeURIComponent(packId)}/questions/${category}/${level}/${activityNum}`,
+      { method: 'PUT', body: input },
+    );
   },
 
   /** Reverts to the seeded default; 404s when there was no override. */
   revertQuestion(
+    packId: string,
     category: ApiCategoryKey,
     level: number,
     activityNum: number,
   ): Promise<ApiQuestion> {
-    return request(`/content/questions/${category}/${level}/${activityNum}`, { method: 'DELETE' });
+    return request(
+      `/packs/${encodeURIComponent(packId)}/questions/${category}/${level}/${activityNum}`,
+      { method: 'DELETE' },
+    );
   },
 
   settings(): Promise<ApiContentSettings> {
@@ -205,6 +248,41 @@ export const contentApi = {
 
   updateSettings(showMiniLesson: boolean): Promise<ApiContentSettings> {
     return request('/content/settings', { method: 'PUT', body: { showMiniLesson } });
+  },
+};
+
+/* -------------------------------------------------------------------- packs */
+
+export const packsApi = {
+  list(mine = false): Promise<ApiPack[]> {
+    return request<{ items: ApiPack[] }>('/packs', { query: { mine } }).then((r) => r.items);
+  },
+
+  create(name: string): Promise<ApiPack> {
+    return request('/packs', { method: 'POST', body: { name } });
+  },
+
+  get(id: string): Promise<ApiPack> {
+    return request(`/packs/${encodeURIComponent(id)}`);
+  },
+
+  patch(id: string, input: Partial<PatchPackRequest>): Promise<ApiPack> {
+    return request(`/packs/${encodeURIComponent(id)}`, { method: 'PATCH', body: input });
+  },
+
+  duplicate(id: string, name?: string): Promise<ApiPack> {
+    return request(`/packs/${encodeURIComponent(id)}/duplicate`, {
+      method: 'POST',
+      body: name ? { name } : undefined,
+    });
+  },
+
+  publish(id: string): Promise<ApiPack> {
+    return request(`/packs/${encodeURIComponent(id)}/publish`, { method: 'POST' });
+  },
+
+  archive(id: string): Promise<ApiPack> {
+    return request(`/packs/${encodeURIComponent(id)}/archive`, { method: 'POST' });
   },
 };
 
