@@ -12,6 +12,7 @@ export default function AdminLayout() {
   const [signingOut, setSigningOut] = useState(false);
   const current = navForPath(pathname);
 
+  const visibleNav = NAV.filter((item) => user && item.roles.includes(user.role as 'admin' | 'teacher'));
   const sections = ['Manage', 'Content'] as const;
 
   const handleSignOut = async () => {
@@ -37,7 +38,7 @@ export default function AdminLayout() {
         {sections.map((section) => (
           <div key={section}>
             <div className="sidebar__section">{section}</div>
-            {NAV.filter((item) => item.section === section).map((item) => (
+            {visibleNav.filter((item) => item.section === section).map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}

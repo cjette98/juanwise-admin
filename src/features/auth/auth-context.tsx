@@ -12,11 +12,11 @@ import {
 /**
  * Who is signed in to the console.
  *
- * The API is shared with the game, so a teacher's or a student's credentials
- * are perfectly valid at `POST /auth/login` — they just have no business here.
+ * The API is shared with the game, so a teacher's, a student's, or any other credentials
+ * are perfectly valid at `POST /auth/login` — only teachers and administrators belong here.
  * The role is therefore checked twice: once on the session the login returns,
- * and again on every cold start against `/auth/me`, because the admin claim can
- * be revoked out of band (juanwise-be `scripts/grant-admin.ts`) while a stored
+ * and again on every cold start against `/auth/me`, because roles can
+ * be revoked or changed out of band (juanwise-be `scripts/grant-admin.ts`) while a stored
  * session is still inside its hour.
  */
 interface AuthContextValue {
@@ -28,7 +28,7 @@ interface AuthContextValue {
 }
 
 const NOT_ADMIN =
-  'That account is not a JuanWise administrator. Sign in with the main admin account.';
+  "That account isn't a JuanWise teacher or administrator account. Sign in with a teacher or admin account.";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .me()
       .then((me) => {
         if (!alive) return;
-        if (me.role === 'admin') setUser(me);
+        if (me.role === 'admin' || me.role === 'teacher') setUser(me);
         else clearSession();
       })
       .catch(() => {
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (username: string, password: string) => {
     const session = await authApi.login({ username: username.trim(), password });
 
-    if (session.user.role !== 'admin') {
+    if (session.user.role !== 'admin' && session.user.role !== 'teacher') {
       // The tokens are real, so drop them server-side too rather than just
       // forgetting them here.
       await authApi.logout();

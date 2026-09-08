@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   contentApi,
   errorMessage,
   mediaApi,
+  packsApi,
   type ApiCategory,
   type ApiCategoryKey,
   type ApiJigsawItem,
@@ -77,8 +79,26 @@ const emptyDetails = (level: string, activityNum: string): PictureDetails => ({
 });
 
 export default function JigsawScreen() {
+  const { packId } = useParams<{ packId: string }>();
+
+  if (!packId) {
+    return <Banner tone="error">This pack could not be identified.</Banner>;
+  }
+
+  return <JigsawScreenForPack packId={packId} />;
+}
+
+/**
+ * `packId` is guaranteed present at runtime — this screen only ever mounts
+ * under a route that supplies `:packId` — but `useParams` types it as
+ * possibly `undefined`. Splitting the "no packId" guard into the outer
+ * component lets every hook below take a real, non-optional `string` rather
+ * than reaching for a non-null assertion at each call site.
+ */
+function JigsawScreenForPack({ packId }: { packId: string }) {
   const [selected, setSelected] = useState<ApiCategoryKey>('history');
-  const categories = useAsync(() => contentApi.categories(), []);
+  const pack = useAsync(() => packsApi.get(packId), [packId]);
+  const categories = useAsync(() => contentApi.categories(packId), [packId]);
   const category = categories.data?.find((c) => c.key === selected) ?? null;
 
   return (
@@ -112,7 +132,13 @@ export default function JigsawScreen() {
       ) : categories.error ? (
         <Banner tone="error">{categories.error}</Banner>
       ) : category ? (
-        <CategoryJigsaws key={category.key} category={category} onSaved={categories.reload} />
+        <CategoryJigsaws
+          key={category.key}
+          packId={packId}
+          packName={pack.data?.name}
+          category={category}
+          onSaved={categories.reload}
+        />
       ) : null}
     </>
   );
@@ -120,7 +146,17 @@ export default function JigsawScreen() {
 
 /* ---------------------------------------------------------------- category */
 
-function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved: () => void }) {
+function CategoryJigsaws({
+  packId,
+  packName,
+  category,
+  onSaved,
+}: {
+  packId: string;
+  packName: string | undefined;
+  category: ApiCategory;
+  onSaved: () => void;
+}) {
   const [items, setItems] = useState<ApiJigsawItem[]>(category.jigsaws);
   const [slots, setSlots] = useState<Record<string, string>>(category.jigsawSlots);
   const [pieces, setPieces] = useState<Record<string, ApiJigsawPieceCount>>(category.jigsawPieces);
@@ -157,6 +193,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
     setNotice(null);
     try {
       const saved = await contentApi.replaceJigsaws(
+        packId,
         category.key,
         nextItems,
         nextSlots,
@@ -326,7 +363,9 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
         <div>
           <div className="jigsaw-overview__eyebrow">{category.label} collection</div>
           <h2>Choose an activity to edit</h2>
-          <p>{assignedCount} of 30 activities ready</p>
+          <p>
+            Editing "{packName ?? '…'}" — {assignedCount} of 30 activities ready
+          </p>
         </div>
         <div className="jigsaw-progress" aria-label={`${assignedCount} of 30 activities ready`}>
           <span style={{ width: `${(assignedCount / 30) * 100}%`, background: categoryColor(category.key) }} />
@@ -407,7 +446,7 @@ function CategoryJigsaws({ category, onSaved }: { category: ApiCategory; onSaved
         </aside>
       </div>
 
-      <CategoryFallback category={category} onSaved={onSaved} />
+      <CategoryFallback packId={packId} category={category} onSaved={onSaved} />
     </>
   );
 }
@@ -727,9 +766,11 @@ function SlotEditor({
 /* ---------------------------------------------------------------- fallback */
 
 function CategoryFallback({
+  packId,
   category,
   onSaved,
 }: {
+  packId: string;
   category: ApiCategory;
   onSaved: () => void;
 }) {
@@ -745,7 +786,7 @@ function CategoryFallback({
     setError(null);
     setNotice(null);
     try {
-      await contentApi.updateCategory(category.key, { context_tl: context.trim() || null });
+      await contentApi.updateCategory(packId, category.key, { context_tl: context.trim() || null });
       setNotice('Saved.');
       onSaved();
     } catch (err) {

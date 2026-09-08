@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   contentApi,
   errorMessage,
   mediaApi,
+  packsApi,
   type ApiCategoryKey,
   type ApiQuestion,
   type ApiQuestionType,
@@ -92,11 +94,32 @@ function answerContentSummary(draft: QuizDraft): string {
 }
 
 export default function QuizScreen() {
+  const { packId } = useParams<{ packId: string }>();
+
+  if (!packId) {
+    return <Banner tone="error">This pack could not be identified.</Banner>;
+  }
+
+  return <QuizScreenForPack packId={packId} />;
+}
+
+/**
+ * `packId` is guaranteed present at runtime — this screen only ever mounts
+ * under a route that supplies `:packId` — but `useParams` types it as
+ * possibly `undefined`. Splitting the "no packId" guard into the outer
+ * component lets every hook below take a real, non-optional `string` rather
+ * than reaching for a non-null assertion at each call site.
+ */
+function QuizScreenForPack({ packId }: { packId: string }) {
   const [category, setCategory] = useState<ApiCategoryKey>('history');
   const [level, setLevel] = useState(1);
   const [activityNum, setActivityNum] = useState(1);
 
-  const questions = useAsync(() => contentApi.questions({ category, level }), [category, level]);
+  const pack = useAsync(() => packsApi.get(packId), [packId]);
+  const questions = useAsync(
+    () => contentApi.questions(packId, { category, level }),
+    [packId, category, level],
+  );
 
   const selected = useMemo(
     () => questions.data?.find((q) => q.activityNum === activityNum) ?? null,
@@ -107,7 +130,7 @@ export default function QuizScreen() {
     <>
       <Card
         title="Choose an activity"
-        hint="Every category has 5 levels of 6 activities. Level 1 is what a new player sees first."
+        hint={`Editing "${pack.data?.name ?? '…'}" — every category has 5 levels of 6 activities.`}
       >
         <div className="grid" style={{ gap: 14 }}>
           <div className="row">
@@ -183,6 +206,7 @@ export default function QuizScreen() {
         <QuestionEditor
           key={selected.id}
           question={selected}
+          packId={packId}
           category={category}
           level={level}
           activityNum={activityNum}
@@ -195,12 +219,14 @@ export default function QuizScreen() {
 
 function QuestionEditor({
   question,
+  packId,
   category,
   level,
   activityNum,
   onSaved,
 }: {
   question: ApiQuestion;
+  packId: string;
   category: ApiCategoryKey;
   level: number;
   activityNum: number;
@@ -294,7 +320,7 @@ function QuestionEditor({
     setBusy('save');
     setError(null);
     try {
-      await contentApi.upsertQuestion(category, level, activityNum, toQuestionRequest(draft));
+      await contentApi.upsertQuestion(packId, category, level, activityNum, toQuestionRequest(draft));
       setSaved(true);
       onSaved();
     } catch (err) {
@@ -311,7 +337,7 @@ function QuestionEditor({
     setBusy('revert');
     setError(null);
     try {
-      await contentApi.revertQuestion(category, level, activityNum);
+      await contentApi.revertQuestion(packId, category, level, activityNum);
       setSaved(false);
       onSaved();
     } catch (err) {
