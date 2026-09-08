@@ -6,6 +6,7 @@ export interface NavItem {
   title: string;
   subtitle: string;
   section: 'Manage' | 'Content';
+  roles: ('admin' | 'teacher')[];
 }
 
 export const NAV: NavItem[] = [
@@ -16,6 +17,7 @@ export const NAV: NavItem[] = [
     title: 'Dashboard',
     subtitle: 'Everything registered on JuanWise at a glance',
     section: 'Manage',
+    roles: ['admin'],
   },
   {
     path: '/teachers',
@@ -24,6 +26,7 @@ export const NAV: NavItem[] = [
     title: 'Teachers',
     subtitle: 'Every teacher account and the classes they own',
     section: 'Manage',
+    roles: ['admin'],
   },
   {
     path: '/students',
@@ -32,6 +35,7 @@ export const NAV: NavItem[] = [
     title: 'Students',
     subtitle: 'Every student, with the teacher and class code they joined',
     section: 'Manage',
+    roles: ['admin'],
   },
   {
     path: '/leaderboard',
@@ -40,6 +44,16 @@ export const NAV: NavItem[] = [
     title: 'Leaderboard',
     subtitle: 'Guests, and the top 10 of every class',
     section: 'Manage',
+    roles: ['admin'],
+  },
+  {
+    path: '/packs',
+    label: 'Packs',
+    icon: '📦',
+    title: 'Content Packs',
+    subtitle: 'Build, duplicate and publish the activities your classes play',
+    section: 'Content',
+    roles: ['admin', 'teacher'],
   },
   {
     path: '/quiz',
@@ -48,6 +62,7 @@ export const NAV: NavItem[] = [
     title: 'Quiz Content',
     subtitle: 'Author the question, choices and correct answer for each activity',
     section: 'Content',
+    roles: ['admin', 'teacher'],
   },
   {
     path: '/jigsaw',
@@ -56,6 +71,16 @@ export const NAV: NavItem[] = [
     title: 'Jigsaw Content',
     subtitle: 'The picture the game cuts into a puzzle, its mini-lesson and its definition',
     section: 'Content',
+    roles: ['admin', 'teacher'],
+  },
+  {
+    path: '/my-classes',
+    label: 'My Classes',
+    icon: '🏫',
+    title: 'My Classes',
+    subtitle: 'The classes you handle, and which pack each one plays',
+    section: 'Manage',
+    roles: ['teacher'],
   },
 ];
 
