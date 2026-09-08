@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ApiQuestion } from '@/shared/api';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { ApiPack, ApiQuestion } from '@/shared/api';
 
 const upsertQuestion = vi.fn().mockResolvedValue(undefined);
 const revertQuestion = vi.fn().mockResolvedValue(undefined);
 const questions = vi.fn();
+const getPack = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -14,10 +16,29 @@ vi.mock('@/shared/api', async (importOriginal) => ({
     upsertQuestion: (...args: unknown[]) => upsertQuestion(...args),
     revertQuestion: (...args: unknown[]) => revertQuestion(...args),
   },
+  packsApi: {
+    get: (...args: unknown[]) => getPack(...args),
+  },
   errorMessage: (_err: unknown, fallback = 'error') => fallback,
 }));
 
 const { default: QuizScreen } = await import('./quiz-screen');
+
+const pack = (over: Partial<ApiPack> = {}): ApiPack => ({
+  id: 'pk_test',
+  name: 'Test Pack',
+  ownerUid: 'teacher-1',
+  origin: 'teacher',
+  forkedFrom: null,
+  status: 'draft',
+  version: 1,
+  publishedAt: null,
+  showMiniLesson: true,
+  classCount: 0,
+  createdAt: null,
+  updatedAt: null,
+  ...over,
+});
 
 const question = (over: Partial<ApiQuestion> = {}): ApiQuestion => ({
   id: 'history_1_1',
@@ -43,8 +64,15 @@ const question = (over: Partial<ApiQuestion> = {}): ApiQuestion => ({
 
 const renderScreen = async (q: ApiQuestion = question()) => {
   questions.mockResolvedValue([q]);
+  getPack.mockResolvedValue(pack());
   const user = userEvent.setup();
-  render(<QuizScreen />);
+  render(
+    <MemoryRouter initialEntries={['/packs/pk_test/quiz']}>
+      <Routes>
+        <Route path="/packs/:packId/quiz" element={<QuizScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  );
   await screen.findByRole('radio', { name: /Multiple choice/ });
   return { user };
 };
@@ -160,7 +188,7 @@ describe('identification answer fields', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(upsertQuestion).toHaveBeenCalledTimes(1));
-    expect(upsertQuestion).toHaveBeenCalledWith('history', 1, 1, {
+    expect(upsertQuestion).toHaveBeenCalledWith('pk_test', 'history', 1, 1, {
       type: 'identification',
       question: 'Sino ang nagtatag ng Katipunan?',
       hint: 'Itinatag noong 1892.',
@@ -199,6 +227,7 @@ describe('mini-lesson field', () => {
 
     await waitFor(() => expect(upsertQuestion).toHaveBeenCalledTimes(1));
     expect(upsertQuestion).toHaveBeenCalledWith(
+      'pk_test',
       'history',
       1,
       1,
