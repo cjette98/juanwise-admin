@@ -2,9 +2,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AdminLayout from '@/app/layout';
 import { AuthProvider, useAuth } from '@/features/auth/auth-context';
 import LoginScreen from '@/features/auth/login-screen';
+import MyClassesScreen from '@/features/classes/my-classes-screen';
 import DashboardScreen from '@/features/dashboard/dashboard-screen';
 import JigsawScreen from '@/features/jigsaw/jigsaw-screen';
 import LeaderboardScreen from '@/features/leaderboard/leaderboard-screen';
+import PackListScreen from '@/features/packs/pack-list-screen';
 import QuizScreen from '@/features/quiz/quiz-screen';
 import StudentsScreen from '@/features/students/students-screen';
 import TeachersScreen from '@/features/teachers/teachers-screen';
@@ -34,12 +36,14 @@ function Gate() {
   return (
     <Routes>
       <Route element={<AdminLayout />}>
-        <Route index element={<DashboardScreen />} />
+        <Route index element={user.role === 'admin' ? <DashboardScreen /> : <Navigate to="/packs" replace />} />
         <Route path="/teachers" element={<TeachersScreen />} />
         <Route path="/students" element={<StudentsScreen />} />
         <Route path="/leaderboard" element={<LeaderboardScreen />} />
-        <Route path="/quiz" element={<QuizScreen />} />
-        <Route path="/jigsaw" element={<JigsawScreen />} />
+        <Route path="/packs" element={<PackListScreen />} />
+        <Route path="/my-classes" element={<MyClassesScreen />} />
+        <Route path="/packs/:packId/quiz" element={<QuizScreen />} />
+        <Route path="/packs/:packId/jigsaw" element={<JigsawScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
