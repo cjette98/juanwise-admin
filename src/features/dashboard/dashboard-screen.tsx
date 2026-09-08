@@ -111,10 +111,10 @@ export default function DashboardScreen() {
 
       <Card title="Content shortcuts">
         <div className="row">
-          <Link to="/quiz">
+          <Link to="/packs/system-default/quiz">
             <Button variant="secondary">📝 Author quiz questions</Button>
           </Link>
-          <Link to="/jigsaw">
+          <Link to="/packs/system-default/jigsaw">
             <Button variant="secondary">🧩 Set jigsaw pictures</Button>
           </Link>
           <Link to="/leaderboard">
