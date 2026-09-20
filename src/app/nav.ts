@@ -48,7 +48,7 @@ export const NAV: NavItem[] = [
   },
   {
     path: '/packs',
-    label: 'Packs',
+    label: 'Class Activities',
     icon: '📦',
     title: 'Content Packs',
     subtitle: 'Build, duplicate and publish the activities your classes play',

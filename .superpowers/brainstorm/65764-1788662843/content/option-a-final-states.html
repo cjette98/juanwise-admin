@@ -1,0 +1,65 @@
+<style>
+  .lead{max-width:820px;margin-bottom:24px}.lead b{color:#1746a2}
+  .states{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+  .state{border:1px solid #dbe3ee;border-radius:16px;overflow:hidden;background:#f6f8fb;box-shadow:0 8px 24px rgba(25,45,80,.07)}
+  .state-head{background:#fff;border-bottom:1px solid #e2e8f0;padding:15px 16px}.state-head h3{margin:0;font-size:16px}.state-head p{margin:3px 0 0;color:#68768a;font-size:12px}
+  .editor{padding:14px}.label{font-size:10px;font-weight:800;letter-spacing:.04em;color:#35435a;margin:13px 0 6px}.label:first-child{margin-top:0}
+  .types{display:grid;grid-template-columns:1fr;gap:6px}.type{background:#fff;border:1px solid #d9e1ec;border-radius:9px;padding:8px 9px}.type.on{border:2px solid #1746a2;background:#f2f6ff;padding:7px 8px}.type b{display:block;font-size:11px;color:#17243a}.type small{display:block;font-size:9px;color:#6c788b;margin-top:1px}
+  .input{background:#fff;border:1px solid #d6deea;border-radius:8px;padding:9px 10px;font-size:11px;color:#334157;min-height:35px}.question{min-height:50px}.row{display:flex;align-items:center;gap:7px;margin:6px 0}.row .input{flex:1}.mark{width:21px;height:21px;border-radius:50%;border:1px solid #b8c2d0;display:grid;place-items:center;font-size:9px;flex:none}.mark.ok{background:#23834c;border-color:#23834c;color:#fff}
+  .hint{font-size:9px;color:#6f7d91;margin-top:5px}.add{margin-top:7px;border:1px dashed #9eb0c8;background:#fff;color:#1746a2;border-radius:8px;padding:7px;width:100%;font-size:10px;font-weight:700}
+  .number{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:5px;background:#eaf0fc;color:#1746a2;margin-right:5px}
+  .bottom{padding:11px 14px;background:#fff;border-top:1px solid #e1e7ef;display:flex;gap:7px;justify-content:flex-end}.bottom button{border:1px solid #d3dce8;border-radius:8px;background:#fff;padding:7px 9px;font-size:10px;font-weight:700}.bottom .save{background:#083da6;color:#fff;border-color:#083da6}
+  .modal-wrap{margin-top:25px;border:1px solid #dbe3ee;border-radius:16px;padding:20px;background:linear-gradient(135deg,#f8faff,#f4f7fb)}.modal-wrap>h3{text-align:center;margin:0 0 15px}.modal{max-width:460px;margin:auto;background:#fff;border:1px solid #dce3ed;border-radius:13px;padding:18px;box-shadow:0 16px 40px rgba(20,39,68,.16)}.modal h4{margin:0 0 5px}.modal p{margin:0;color:#657389;font-size:12px}.keep{margin:13px 0 12px;padding:10px;background:#eef6ff;border-radius:8px;font-size:11px;color:#315276}.clear{padding:10px;background:#fff4e5;border-radius:8px;font-size:11px;color:#765314}.actions{display:flex;justify-content:flex-end;gap:7px;margin-top:14px}.actions button{border:1px solid #d6deea;background:#fff;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:700}.actions .danger{background:#b42318;border-color:#b42318;color:#fff}
+  @media(max-width:900px){.states{grid-template-columns:1fr}.types{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.types{grid-template-columns:1fr}}
+</style>
+
+<div class="lead">
+  <h2>Option A — complete editor states</h2>
+  <p class="subtitle">The top of the page stays the same. Only section 3 changes according to the selected question type.</p>
+</div>
+
+<div class="states">
+  <section class="state">
+    <div class="state-head"><h3>Multiple choice</h3><p>Choose one correct option</p></div>
+    <div class="editor">
+      <div class="label"><span class="number">1</span>QUESTION TYPE</div>
+      <div class="types"><div class="type on"><b>Multiple choice</b><small>Choose one correct answer</small></div><div class="type"><b>Enumeration</b><small>Supply several answers</small></div><div class="type"><b>Identification</b><small>Type one answer</small></div></div>
+      <div class="label"><span class="number">2</span>QUESTION</div><div class="input question">Who founded the Katipunan in 1892?</div>
+      <div class="label"><span class="number">3</span>CHOICES</div>
+      <div class="row"><span class="mark ok">✓</span><div class="input">Andres Bonifacio</div></div><div class="row"><span class="mark">B</span><div class="input">Jose Rizal</div></div><div class="row"><span class="mark">C</span><div class="input">Emilio Aguinaldo</div></div><button class="add">＋ Add choice</button>
+    </div><div class="bottom"><button>Revert to default</button><button class="save">Save changes</button></div>
+  </section>
+
+  <section class="state">
+    <div class="state-head"><h3>Enumeration</h3><p>Require several answers</p></div>
+    <div class="editor">
+      <div class="label"><span class="number">1</span>QUESTION TYPE</div>
+      <div class="types"><div class="type"><b>Multiple choice</b><small>Choose one correct answer</small></div><div class="type on"><b>Enumeration</b><small>Supply several answers</small></div><div class="type"><b>Identification</b><small>Type one answer</small></div></div>
+      <div class="label"><span class="number">2</span>QUESTION</div><div class="input question">Name three major island groups of the Philippines.</div>
+      <div class="label"><span class="number">3</span>ACCEPTED ANSWERS</div>
+      <div class="input" style="min-height:100px;line-height:1.8">Luzon<br>Visayas<br>Mindanao<br>Palawan<br>...</div><div class="hint">One answer per line · Minimum 10 entries</div>
+      <div class="label">ANSWERS REQUIRED</div><div class="input" style="width:75px">3</div>
+    </div><div class="bottom"><button>Revert to default</button><button class="save">Save changes</button></div>
+  </section>
+
+  <section class="state">
+    <div class="state-head"><h3>Identification</h3><p>Accept one answer or its variations</p></div>
+    <div class="editor">
+      <div class="label"><span class="number">1</span>QUESTION TYPE</div>
+      <div class="types"><div class="type"><b>Multiple choice</b><small>Choose one correct answer</small></div><div class="type"><b>Enumeration</b><small>Supply several answers</small></div><div class="type on"><b>Identification</b><small>Type one answer</small></div></div>
+      <div class="label"><span class="number">2</span>QUESTION</div><div class="input question">Who founded the Katipunan in 1892?</div>
+      <div class="label"><span class="number">3</span>CORRECT ANSWER</div><div class="input">Andrés Bonifacio</div>
+      <div class="label">OTHER ACCEPTED ANSWERS <span style="font-weight:500;color:#8490a2">· Optional</span></div><div class="row"><div class="input">Andres Bonifacio</div></div><div class="row"><div class="input">Bonifacio</div></div><button class="add">＋ Add accepted answer</button><div class="hint">Capitalization and extra spaces are ignored.</div>
+    </div><div class="bottom"><button>Revert to default</button><button class="save">Save changes</button></div>
+  </section>
+</div>
+
+<section class="modal-wrap">
+  <h3>When the teacher changes question type</h3>
+  <div class="modal">
+    <h4>Change to Enumeration?</h4><p>This question already has multiple-choice answers.</p>
+    <div class="keep"><b>Kept:</b> Question, hint, and explanation</div>
+    <div class="clear"><b>Cleared:</b> 3 choices and the selected correct answer</div>
+    <div class="actions"><button>Keep Multiple choice</button><button class="danger">Change and clear answers</button></div>
+  </div>
+</section>
