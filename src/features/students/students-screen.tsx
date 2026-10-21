@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Badge, Banner, Button, Card, Empty, Input, Loading, Select } from '@/shared/components/ui';
-import { formatDate, matchesSearch } from '@/shared/lib/format';
+import { formatDate, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
 import { teacherForStudent, useDirectory } from '@/features/directory/use-directory';
 
 type Filter = 'all' | 'assigned' | 'guest';
@@ -114,10 +114,8 @@ export default function StudentsScreen() {
                     <div className="table__sub">@{student.username}</div>
                   </td>
                   <td className="table__sub">{student.lrn ?? '—'}</td>
-                  <td className="table__sub">
-                    {[student.grade ? `Grade ${student.grade}` : null, student.section]
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
+                  <td className="table__sub" title={sectionNote(student.section)}>
+                    {gradeSection(student.grade, student.section)}
                   </td>
                   <td>
                     {teacher ? (

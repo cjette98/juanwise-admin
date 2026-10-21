@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Badge, Banner, Button, Card, Empty, Loading, Stat } from '@/shared/components/ui';
-import { formatDate } from '@/shared/lib/format';
+import { formatDate, gradeSection, sectionNote } from '@/shared/lib/format';
 import { useDirectory } from '@/features/directory/use-directory';
 
 /** The landing page: the same four counts an admin opens the console to check. */
@@ -88,10 +88,8 @@ export default function DashboardScreen() {
                     <tr key={klass.id}>
                       <td>
                         <div className="table__primary">{klass.name}</div>
-                        <div className="table__sub">
-                          {[klass.gradeLevel && `Grade ${klass.gradeLevel}`, klass.section]
-                            .filter(Boolean)
-                            .join(' · ') || '—'}
+                        <div className="table__sub" title={sectionNote(klass.section)}>
+                          {gradeSection(klass.gradeLevel, klass.section)}
                         </div>
                       </td>
                       <td>{teacher?.name ?? <span className="table__sub">Unknown teacher</span>}</td>
