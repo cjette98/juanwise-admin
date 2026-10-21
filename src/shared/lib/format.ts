@@ -18,6 +18,36 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${mm}:${ss}`;
 }
 
+/**
+ * A section as the dashboard may show it: letters and digits only (item 1.4 of
+ * the client evaluation). Registration refuses anything else now, but accounts
+ * created before that rule can hold spaces or punctuation, so the value is
+ * cleaned on the way to the screen.
+ */
+export function cleanSection(section: string | null | undefined): string {
+  return (section ?? '').replace(/[^A-Za-z0-9]/g, '');
+}
+
+/** `Grade 6 · Infinity1`, with either half allowed to be missing. */
+export function gradeSection(
+  grade: string | null | undefined,
+  section: string | null | undefined,
+): string {
+  const parts = [grade ? `Grade ${grade}` : null, cleanSection(section) || null].filter(Boolean);
+  return parts.join(' · ') || '—';
+}
+
+/**
+ * What the row says on hover when the stored section is not what is shown —
+ * the admin is the one who would ask the student to fix it, so the raw value
+ * must stay visible somewhere.
+ */
+export function sectionNote(section: string | null | undefined): string | undefined {
+  const raw = (section ?? '').trim();
+  if (!raw || raw === cleanSection(raw)) return undefined;
+  return `Stored as “${raw}” — only letters and numbers are shown`;
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';

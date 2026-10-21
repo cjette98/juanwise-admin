@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { ApiClass } from '@/shared/api';
 import { Badge, Banner, Button, Card, Empty, Input, Loading } from '@/shared/components/ui';
-import { formatDate, matchesSearch } from '@/shared/lib/format';
+import { formatDate, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
 import { categoryLabel } from '@/shared/theme/colors';
 import { useDirectory } from '@/features/directory/use-directory';
 
@@ -77,6 +77,7 @@ export default function TeachersScreen() {
                 <th style={{ width: 32 }} />
                 <th>Teacher</th>
                 <th>Teacher ID</th>
+                <th>Grade &amp; section</th>
                 <th>Email</th>
                 <th className="table__num">Classes</th>
                 <th className="table__num">Students</th>
@@ -103,6 +104,9 @@ export default function TeachersScreen() {
                         <div className="table__sub">@{teacher.username}</div>
                       </td>
                       <td>{teacher.teacherId ?? <span className="table__sub">—</span>}</td>
+                      <td className="table__sub" title={sectionNote(teacher.section)}>
+                        {gradeSection(teacher.grade, teacher.section)}
+                      </td>
                       <td className="table__sub">{teacher.email}</td>
                       <td className="table__num">{classes.length}</td>
                       <td className="table__num">{students}</td>
@@ -111,7 +115,7 @@ export default function TeachersScreen() {
 
                     {isOpen && (
                       <tr>
-                        <td colSpan={7} style={{ background: 'var(--canvas)', padding: '12px 14px 16px 46px' }}>
+                        <td colSpan={8} style={{ background: 'var(--canvas)', padding: '12px 14px 16px 46px' }}>
                           <ClassList classes={classes} />
                         </td>
                       </tr>
@@ -142,12 +146,11 @@ function ClassList({ classes }: { classes: ApiClass[] }) {
           </div>
           <div className="table__sub" style={{ marginTop: 4 }}>
             {[
-              klass.gradeLevel ? `Grade ${klass.gradeLevel}` : null,
-              klass.section,
+              gradeSection(klass.gradeLevel, klass.section),
               `${klass.memberCount} student${klass.memberCount === 1 ? '' : 's'}`,
               `created ${formatDate(klass.createdAt)}`,
             ]
-              .filter(Boolean)
+              .filter((part) => part && part !== '—')
               .join(' · ')}
           </div>
           <div className="row" style={{ marginTop: 8 }}>
