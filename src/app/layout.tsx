@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { API_ORIGIN } from '@/shared/api';
 import { images } from '@/shared/assets/images';
-import { Button } from '@/shared/components/ui';
+import { Button, ConfirmDialog } from '@/shared/components/ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { NAV, navForPath } from './nav';
 
@@ -10,12 +10,14 @@ export default function AdminLayout() {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
   const [signingOut, setSigningOut] = useState(false);
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const current = navForPath(pathname);
 
   const visibleNav = NAV.filter((item) => user && item.roles.includes(user.role as 'admin' | 'teacher'));
   const sections = ['Manage', 'Content'] as const;
 
   const handleSignOut = async () => {
+    setConfirmingSignOut(false);
     setSigningOut(true);
     try {
       await signOut();
@@ -72,7 +74,12 @@ export default function AdminLayout() {
             {current?.subtitle && <div className="topbar__subtitle">{current.subtitle}</div>}
           </div>
           <div className="topbar__actions">
-            <Button variant="secondary" small onClick={handleSignOut} busy={signingOut}>
+            <Button
+              variant="secondary"
+              small
+              onClick={() => setConfirmingSignOut(true)}
+              busy={signingOut}
+            >
               Sign out
             </Button>
           </div>
@@ -82,6 +89,19 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* The app asks before signing out; the console used to go straight out on
+          the click, which loses whatever was half-edited on the screen. */}
+      <ConfirmDialog
+        open={confirmingSignOut}
+        title="Sign out of JuanWise Admin?"
+        confirmLabel="Yes, sign out"
+        cancelLabel="No, stay signed in"
+        onConfirm={handleSignOut}
+        onCancel={() => setConfirmingSignOut(false)}
+      >
+        <p>You will need your username and password to get back in.</p>
+      </ConfirmDialog>
     </div>
   );
 }
