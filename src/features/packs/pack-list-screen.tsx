@@ -1,7 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { errorMessage, packsApi, type ApiPackStatus } from '@/shared/api';
-import { Badge, Banner, Button, Card, Empty, Field, Input, Loading } from '@/shared/components/ui';
+import { errorMessage, packsApi, type ApiPack, type ApiPackStatus } from '@/shared/api';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  ConfirmDialog,
+  Empty,
+  Field,
+  Input,
+  Loading,
+} from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { matchesSearch } from '@/shared/lib/format';
 import { useAuth } from '@/features/auth/auth-context';
@@ -35,6 +45,7 @@ export default function PackListScreen() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [newPackOpen, setNewPackOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ApiPack | null>(null);
 
   const rows = useMemo(
     () => (packs ?? []).filter((pack) => matchesSearch(search, pack.name)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -46,6 +57,27 @@ export default function PackListScreen() {
     setActionError(null);
     try {
       await action();
+      reload();
+    } catch (err) {
+      setActionError(errorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  /**
+   * Item W3.2 of the client evaluation. Archive only hides a pack; this takes
+   * its questions and pictures with it, so it is confirmed first and the
+   * dialog stays up with the server's reason if it is refused.
+   */
+  const deletePack = async () => {
+    if (!pendingDelete) return;
+    const pack = pendingDelete;
+    setBusyKey(`${pack.id}:delete`);
+    setActionError(null);
+    try {
+      await packsApi.remove(pack.id);
+      setPendingDelete(null);
       reload();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -96,7 +128,9 @@ export default function PackListScreen() {
       }
       bodyless
     >
-      {actionError && (
+      {/* While the delete dialog is up the failure belongs inside it, not
+          behind it. */}
+      {actionError && !pendingDelete && (
         <div style={{ padding: '12px 14px 0' }}>
           <Banner tone="error">{actionError}</Banner>
         </div>
@@ -187,6 +221,15 @@ export default function PackListScreen() {
                             Archive
                           </Button>
                         )}
+                        {owned && pack.origin !== 'system' && pack.classCount === 0 && (
+                          <Button
+                            variant="danger"
+                            small
+                            onClick={() => setPendingDelete(pack)}
+                          >
+                            Delete pack
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -198,6 +241,26 @@ export default function PackListScreen() {
       )}
 
       <NewPackDialog open={newPackOpen} onClose={() => setNewPackOpen(false)} onCreate={createPack} />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? 'this pack'}?`}
+        confirmLabel="Yes, delete the pack"
+        cancelLabel="Keep the pack"
+        danger
+        busy={busyKey === `${pendingDelete?.id}:delete`}
+        onConfirm={deletePack}
+        onCancel={() => {
+          setPendingDelete(null);
+          setActionError(null);
+        }}
+      >
+        <p>
+          Its questions and jigsaw pictures go with it, and nothing brings them back. Archive
+          instead if you only want it out of the way.
+        </p>
+        {pendingDelete && actionError && <Banner tone="error">{actionError}</Banner>}
+      </ConfirmDialog>
     </Card>
   );
 }

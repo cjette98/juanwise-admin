@@ -246,6 +246,10 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   /** Styles the confirm action as destructive and keeps focus on the safe one. */
   danger?: boolean;
+  /** Keeps the dialog up with both buttons locked while the action runs. */
+  busy?: boolean;
+  /** Blocks the confirm action — an unfinished form inside the dialog. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -265,6 +269,8 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger,
+  busy,
+  confirmDisabled,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -289,7 +295,9 @@ export function ConfirmDialog({
       // still thinks it is open. Handle it as a cancel instead.
       onCancel={(event) => {
         event.preventDefault();
-        onCancel();
+        // Escaping out mid-request would leave the caller believing it was
+        // cancelled while the write is still on its way.
+        if (!busy) onCancel();
       }}
     >
       <h2 className="dialog__title" id={titleId}>
@@ -297,10 +305,15 @@ export function ConfirmDialog({
       </h2>
       <div className="dialog__body">{children}</div>
       <div className="dialog__actions">
-        <Button variant="secondary" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>
           {cancelLabel}
         </Button>
-        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
+        <Button
+          variant={danger ? 'danger' : 'primary'}
+          onClick={onConfirm}
+          busy={busy}
+          disabled={confirmDisabled}
+        >
           {confirmLabel}
         </Button>
       </div>

@@ -49,6 +49,10 @@ export interface ApiUserProfile {
   disabled: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Null for an account that registered and never signed in — see W2.1. */
+  lastLoginAt: string | null;
+  /** When an admin last set this password, so the app can tell the student. */
+  passwordResetAt: string | null;
 }
 
 export interface ApiCurrentUser extends ApiUserProfile {
