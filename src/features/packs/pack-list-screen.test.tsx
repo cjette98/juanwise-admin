@@ -9,6 +9,7 @@ const create = vi.fn();
 const duplicate = vi.fn();
 const publish = vi.fn();
 const archive = vi.fn();
+const remove = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -18,6 +19,7 @@ vi.mock('@/shared/api', async (importOriginal) => ({
     duplicate: (...args: unknown[]) => duplicate(...args),
     publish: (...args: unknown[]) => publish(...args),
     archive: (...args: unknown[]) => archive(...args),
+    remove: (...args: unknown[]) => remove(...args),
   },
   errorMessage: (err: unknown, fallback = 'error') =>
     err instanceof Error ? err.message : fallback,
@@ -160,5 +162,49 @@ describe('pack list', () => {
     expect(
       await screen.findByText('Cannot archive a pack used by 3 classes.'),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * Item W3.2 of the client evaluation. Archive hides a pack; Delete takes its
+ * questions and pictures with it, so the button is offered only where the
+ * server would allow it and the action is confirmed first.
+ */
+describe('deleting a pack', () => {
+  it('offers Delete on an unused pack of your own', async () => {
+    await renderScreen([pack({ id: 'pack-1', classCount: 0 })]);
+    expect(screen.getByRole('button', { name: 'Delete pack' })).toBeInTheDocument();
+  });
+
+  it('hides Delete on a pack a class still uses', async () => {
+    await renderScreen([pack({ id: 'pack-1', classCount: 2 })]);
+    expect(screen.queryByRole('button', { name: 'Delete pack' })).not.toBeInTheDocument();
+  });
+
+  it('hides Delete on the seeded library', async () => {
+    await renderScreen([pack({ id: 'system-default', origin: 'system' })]);
+    expect(screen.queryByRole('button', { name: 'Delete pack' })).not.toBeInTheDocument();
+  });
+
+  it('asks before deleting', async () => {
+    const { user } = await renderScreen([pack({ id: 'pack-1' })]);
+    remove.mockResolvedValue(undefined);
+
+    await user.click(screen.getByRole('button', { name: 'Delete pack' }));
+    expect(remove).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Yes, delete the pack' }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('pack-1'));
+  });
+
+  it("keeps the dialog up with the server's reason when it refuses", async () => {
+    const { user } = await renderScreen([pack({ id: 'pack-1' })]);
+    remove.mockRejectedValue(new Error('A class still uses this pack.'));
+
+    await user.click(screen.getByRole('button', { name: 'Delete pack' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete the pack' }));
+
+    expect(await screen.findByText('A class still uses this pack.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveAttribute('open');
   });
 });

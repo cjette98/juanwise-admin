@@ -1,12 +1,52 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Banner, Button, Card, Empty, Loading, Stat } from '@/shared/components/ui';
+import { classesApi, errorMessage, type ApiClass } from '@/shared/api';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  ConfirmDialog,
+  Empty,
+  Loading,
+  Select,
+  Stat,
+} from '@/shared/components/ui';
 import { formatDate, gradeSection, sectionNote } from '@/shared/lib/format';
 import { useDirectory } from '@/features/directory/use-directory';
 
-/** The landing page: the same four counts an admin opens the console to check. */
+/**
+ * The landing page: the same four counts an admin opens the console to check,
+ * plus the Delete button for an inactive class (item W3.1 of the client
+ * evaluation).
+ */
 export default function DashboardScreen() {
   const directory = useDirectory();
   const { teachers, students, classes, guests, loading, error, reload } = directory;
+  const [pendingDelete, setPendingDelete] = useState<ApiClass | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [classView, setClassView] = useState<'newest' | 'empty'>('newest');
+
+  const deleteClass = async () => {
+    if (!pendingDelete) return;
+    const klass = pendingDelete;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await classesApi.remove(klass.id);
+      setPendingDelete(null);
+      setNotice(`${klass.name} was deleted and the code ${klass.code} is free again.`);
+      reload();
+    } catch (err) {
+      // The API names what it found — a roster entry, a recorded result — and
+      // that is the whole answer to "why can't I delete this?".
+      setActionError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (loading) return <Loading label="Loading the directory…" />;
   if (error) {
@@ -21,13 +61,21 @@ export default function DashboardScreen() {
   }
 
   const assignedStudents = students.length - guests.length;
-  const classesWithNoMembers = classes.filter((c) => c.memberCount === 0).length;
-  const recentClasses = [...classes]
-    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-    .slice(0, 6);
+  const emptyClasses = classes.filter((c) => c.memberCount === 0);
+  const newestFirst = [...classes].sort((a, b) =>
+    (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
+  );
+  // Newest is the usual glance; the empty view exists so every class that can
+  // be deleted is reachable, not only the six most recent.
+  const shownClasses =
+    classView === 'empty'
+      ? newestFirst.filter((c) => c.memberCount === 0)
+      : newestFirst.slice(0, 6);
 
   return (
     <>
+      {notice && <Banner tone="success">{notice}</Banner>}
+
       <div className="grid grid--stats">
         <Stat label="Teachers" value={teachers.length} hint="Registered teacher accounts" />
         <Stat
@@ -39,8 +87,8 @@ export default function DashboardScreen() {
           label="Classes"
           value={classes.length}
           hint={
-            classesWithNoMembers
-              ? `${classesWithNoMembers} with nobody joined yet`
+            emptyClasses.length
+              ? `${emptyClasses.length} with nobody joined yet`
               : 'All classes have members'
           }
         />
@@ -52,22 +100,40 @@ export default function DashboardScreen() {
       </div>
 
       <Card
-        title="Newest classes"
-        hint="The most recently created classes across every teacher"
+        title={classView === 'empty' ? 'Classes with nobody joined' : 'Newest classes'}
+        hint={
+          classView === 'empty'
+            ? 'Every class no student has joined — these are the ones that can be deleted'
+            : 'The most recently created classes across every teacher'
+        }
         actions={
-          <Link to="/teachers">
-            <Button variant="secondary" small>
-              All teachers
-            </Button>
-          </Link>
+          <>
+            <Select
+              value={classView}
+              onChange={(e) => setClassView(e.target.value as 'newest' | 'empty')}
+              style={{ width: 200 }}
+            >
+              <option value="newest">Newest classes</option>
+              <option value="empty">Nobody joined</option>
+            </Select>
+            <Link to="/teachers">
+              <Button variant="secondary" small>
+                All teachers
+              </Button>
+            </Link>
+          </>
         }
         bodyless
       >
-        {recentClasses.length === 0 ? (
+        {shownClasses.length === 0 ? (
           <Empty
             icon="🏫"
-            title="No classes yet"
-            hint="A class appears here as soon as a teacher creates one in the JuanWise app."
+            title={classView === 'empty' ? 'Every class has students' : 'No classes yet'}
+            hint={
+              classView === 'empty'
+                ? 'Nothing to clear out — a class with a roster is kept.'
+                : 'A class appears here as soon as a teacher creates one in the JuanWise app.'
+            }
           />
         ) : (
           <div className="table-wrap">
@@ -79,10 +145,11 @@ export default function DashboardScreen() {
                   <th>Code</th>
                   <th className="table__num">Students</th>
                   <th>Created</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
-                {recentClasses.map((klass) => {
+                {shownClasses.map((klass) => {
                   const teacher = directory.teacherByUid.get(klass.teacherId);
                   return (
                     <tr key={klass.id}>
@@ -98,6 +165,20 @@ export default function DashboardScreen() {
                       </td>
                       <td className="table__num">{klass.memberCount}</td>
                       <td className="table__sub">{formatDate(klass.createdAt)}</td>
+                      <td>
+                        {klass.memberCount === 0 && (
+                          <Button
+                            variant="danger"
+                            small
+                            onClick={() => {
+                              setPendingDelete(klass);
+                              setNotice(null);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -106,6 +187,26 @@ export default function DashboardScreen() {
           </div>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? 'this class'}?`}
+        confirmLabel="Yes, delete the class"
+        cancelLabel="Keep the class"
+        danger
+        busy={busy}
+        onConfirm={deleteClass}
+        onCancel={() => {
+          setPendingDelete(null);
+          setActionError(null);
+        }}
+      >
+        <p>
+          Nobody has joined it, so nothing is lost — the code {pendingDelete?.code} becomes
+          available again. A class with a roster or recorded results cannot be deleted.
+        </p>
+        {actionError && <Banner tone="error">{actionError}</Banner>}
+      </ConfirmDialog>
 
       <Card title="Content shortcuts">
         <div className="row">
