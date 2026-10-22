@@ -8,6 +8,24 @@ export function formatDate(iso: string | null | undefined): string {
   return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/**
+ * `2026-08-14T06:12:…` → `14 Aug 2026, 2:12 PM`. The console asks for the
+ * exact moment an account was registered or last signed in (items W2.2 and
+ * W2.3), not just the day.
+ */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 /** Seconds → `mm:ss`, the same format the game's results screens use. */
 export function formatDuration(seconds: number | null | undefined): string {
   const total = Math.max(0, Math.round(seconds ?? 0));

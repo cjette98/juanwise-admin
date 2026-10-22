@@ -291,6 +291,13 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* Row actions inside a table cell: close together and never wrapping onto a
+   second line, which would stretch the row. */
+.row--tight {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
 .stat {
   padding: 16px 18px;
 }

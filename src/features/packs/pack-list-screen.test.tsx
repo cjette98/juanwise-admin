@@ -41,6 +41,8 @@ const currentUser: ApiCurrentUser = {
   disabled: false,
   createdAt: null,
   updatedAt: null,
+  lastLoginAt: null,
+  passwordResetAt: null,
   claims: {},
   emailVerified: true,
 };

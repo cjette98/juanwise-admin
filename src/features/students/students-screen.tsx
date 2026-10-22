@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Badge, Banner, Button, Card, Empty, Input, Loading, Select } from '@/shared/components/ui';
-import { formatDate, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
+import { formatDateTime, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
 import { teacherForStudent, useDirectory } from '@/features/directory/use-directory';
+import {
+  AccountActionDialogs,
+  AccountNotice,
+  looksUnused,
+  useAccountActions,
+} from '@/features/directory/use-account-actions';
 
 type Filter = 'all' | 'assigned' | 'guest';
 
@@ -12,12 +18,16 @@ type Filter = 'all' | 'assigned' | 'guest';
  * Both are derived rather than stored on the student — a profile only carries
  * `classId`, so the class supplies the code and the class's `teacherId`
  * supplies the teacher.
+ *
+ * The registration and last-login columns and the two row actions are items
+ * W2.1-W2.3 and W4.1 of the client evaluation.
  */
 export default function StudentsScreen() {
   const directory = useDirectory();
   const { students, classById, loading, error, reload } = directory;
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const actions = useAccountActions(reload);
 
   const rows = useMemo(() => {
     return students
@@ -59,84 +69,109 @@ export default function StudentsScreen() {
   const guestCount = directory.guests.length;
 
   return (
-    <Card
-      title={`Students (${rows.length}${rows.length !== students.length ? ` of ${students.length}` : ''})`}
-      hint={`${students.length - guestCount} in a class · ${guestCount} guest${guestCount === 1 ? '' : 's'} with no class`}
-      actions={
-        <>
-          <Select value={filter} onChange={(e) => setFilter(e.target.value as Filter)} style={{ width: 160 }}>
-            <option value="all">All students</option>
-            <option value="assigned">In a class</option>
-            <option value="guest">Guests only</option>
-          </Select>
-          <Input
-            placeholder="Search name, LRN, class code…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 260 }}
+    <>
+      <AccountNotice actions={actions} />
+      <Card
+        title={`Students (${rows.length}${rows.length !== students.length ? ` of ${students.length}` : ''})`}
+        hint={`${students.length - guestCount} in a class · ${guestCount} guest${guestCount === 1 ? '' : 's'} with no class`}
+        actions={
+          <>
+            <Select value={filter} onChange={(e) => setFilter(e.target.value as Filter)} style={{ width: 160 }}>
+              <option value="all">All students</option>
+              <option value="assigned">In a class</option>
+              <option value="guest">Guests only</option>
+            </Select>
+            <Input
+              placeholder="Search name, LRN, class code…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: 260 }}
+            />
+            <Button variant="secondary" small onClick={reload}>
+              Refresh
+            </Button>
+          </>
+        }
+        bodyless
+      >
+        {rows.length === 0 ? (
+          <Empty
+            icon="🎓"
+            title={students.length === 0 ? 'No students registered yet' : 'No student matches those filters'}
+            hint={
+              students.length === 0
+                ? 'A student appears here as soon as they register in the JuanWise app.'
+                : 'Clear the search box or switch the filter back to “All students”.'
+            }
           />
-          <Button variant="secondary" small onClick={reload}>
-            Refresh
-          </Button>
-        </>
-      }
-      bodyless
-    >
-      {rows.length === 0 ? (
-        <Empty
-          icon="🎓"
-          title={students.length === 0 ? 'No students registered yet' : 'No student matches those filters'}
-          hint={
-            students.length === 0
-              ? 'A student appears here as soon as they register in the JuanWise app.'
-              : 'Clear the search box or switch the filter back to “All students”.'
-          }
-        />
-      ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>LRN</th>
-                <th>Grade &amp; section</th>
-                <th>Teacher</th>
-                <th>Class</th>
-                <th>Class code</th>
-                <th>Registered</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ student, klass, teacher }) => (
-                <tr key={student.uid}>
-                  <td>
-                    <div className="table__primary">{student.name}</div>
-                    <div className="table__sub">@{student.username}</div>
-                  </td>
-                  <td className="table__sub">{student.lrn ?? '—'}</td>
-                  <td className="table__sub" title={sectionNote(student.section)}>
-                    {gradeSection(student.grade, student.section)}
-                  </td>
-                  <td>
-                    {teacher ? (
-                      teacher.name
-                    ) : (
-                      <span className="table__sub">
-                        {klass ? 'Teacher account missing' : 'No teacher'}
-                      </span>
-                    )}
-                  </td>
-                  <td>{klass ? klass.name : <Badge tone="gold">Guest</Badge>}</td>
-                  <td>
-                    {klass ? <Badge tone="code">{klass.code}</Badge> : <span className="table__sub">—</span>}
-                  </td>
-                  <td className="table__sub">{formatDate(student.createdAt)}</td>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>LRN</th>
+                  <th>Grade &amp; section</th>
+                  <th>Teacher</th>
+                  <th>Class</th>
+                  <th>Class code</th>
+                  <th>Registered</th>
+                  <th>Last login</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
+              </thead>
+              <tbody>
+                {rows.map(({ student, klass, teacher }) => (
+                  <tr key={student.uid}>
+                    <td>
+                      <div className="table__primary">{student.name}</div>
+                      <div className="table__sub">@{student.username}</div>
+                    </td>
+                    <td className="table__sub">{student.lrn ?? '—'}</td>
+                    <td className="table__sub" title={sectionNote(student.section)}>
+                      {gradeSection(student.grade, student.section)}
+                    </td>
+                    <td>
+                      {teacher ? (
+                        teacher.name
+                      ) : (
+                        <span className="table__sub">
+                          {klass ? 'Teacher account missing' : 'No teacher'}
+                        </span>
+                      )}
+                    </td>
+                    <td>{klass ? klass.name : <Badge tone="gold">Guest</Badge>}</td>
+                    <td>
+                      {klass ? <Badge tone="code">{klass.code}</Badge> : <span className="table__sub">—</span>}
+                    </td>
+                    <td className="table__sub">{formatDateTime(student.createdAt)}</td>
+                    <td className="table__sub">
+                      {student.lastLoginAt ? (
+                        formatDateTime(student.lastLoginAt)
+                      ) : (
+                        <Badge>Never signed in</Badge>
+                      )}
+                    </td>
+                    <td>
+                      <div className="row row--tight">
+                        <Button variant="secondary" small onClick={() => actions.askPassword(student)}>
+                          Reset password
+                        </Button>
+                        {looksUnused(student) && (
+                          <Button variant="danger" small onClick={() => actions.askDelete(student)}>
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+      <AccountActionDialogs actions={actions} />
+    </>
   );
 }

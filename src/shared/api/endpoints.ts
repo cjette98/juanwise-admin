@@ -88,6 +88,22 @@ export const usersApi = {
   get(uid: string): Promise<ApiUserProfile> {
     return request(`/users/${encodeURIComponent(uid)}`);
   },
+
+  /**
+   * Only an account that registered and was never used — the API refuses the
+   * rest with a 409 naming what it found, which the screen shows as it stands.
+   */
+  remove(uid: string): Promise<void> {
+    return request(`/users/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+  },
+
+  /** For a student with no email on file, who cannot use the emailed reset. */
+  setPassword(uid: string, password: string): Promise<ApiUserProfile> {
+    return request(`/users/${encodeURIComponent(uid)}/password`, {
+      method: 'POST',
+      body: { password },
+    });
+  },
 };
 
 /* ----------------------------------------------------------------- classes */
@@ -105,6 +121,11 @@ export const classesApi = {
 
   mine(): Promise<ApiClass[]> {
     return request<{ items: ApiClass[] }>('/classes/mine').then((r) => r.items);
+  },
+
+  /** Inactive classes only: an empty roster and no recorded results. */
+  remove(id: string): Promise<void> {
+    return request(`/classes/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 
   assignPack(id: string, input: AssignPackRequest): Promise<ApiClass> {
@@ -283,6 +304,11 @@ export const packsApi = {
 
   archive(id: string): Promise<ApiPack> {
     return request(`/packs/${encodeURIComponent(id)}/archive`, { method: 'POST' });
+  },
+
+  /** Unused packs only; the seeded default library can never be deleted. */
+  remove(id: string): Promise<void> {
+    return request(`/packs/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 };
 
