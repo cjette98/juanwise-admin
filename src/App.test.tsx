@@ -27,6 +27,11 @@ vi.mock('@/features/packs/pack-list-screen', () => ({ default: () => <div>Pack l
 vi.mock('@/features/quiz/quiz-screen', () => ({ default: () => <div>Quiz screen</div> }));
 vi.mock('@/features/students/students-screen', () => ({ default: () => <div>Students screen</div> }));
 vi.mock('@/features/teachers/teachers-screen', () => ({ default: () => <div>Teachers screen</div> }));
+vi.mock('@/features/classes/class-overview-screen', () => ({ default: () => <div>Class overview screen</div> }));
+vi.mock('@/features/terms/terms-screen', () => ({
+  default: () => <div>Terms screen</div>,
+  PublicTermsScreen: () => <div>Public terms screen</div>,
+}));
 
 const { default: App } = await import('./App');
 
@@ -56,7 +61,7 @@ const teacher: ApiCurrentUser = {
 
 const admin: ApiCurrentUser = { ...teacher, uid: 'admin-1', role: 'admin' };
 
-const renderAt = (path: string, user: ApiCurrentUser) => {
+const renderAt = (path: string, user: ApiCurrentUser | null) => {
   useAuthMock.mockReturnValue({ user, restoring: false, signIn: vi.fn(), signOut: vi.fn() });
   window.history.pushState({}, '', path);
   render(<App />);
@@ -83,5 +88,32 @@ describe('route role guard', () => {
     renderAt('/my-classes', admin);
     expect(await screen.findByText('Dashboard screen')).toBeInTheDocument();
     expect(screen.queryByText('My classes screen')).not.toBeInTheDocument();
+  });
+});
+
+describe('terms and class overview routes', () => {
+  it('shows the terms to a signed-out visitor at /terms', async () => {
+    renderAt('/terms', null);
+    expect(await screen.findByText('Public terms screen')).toBeInTheDocument();
+  });
+
+  it('shows the login screen anywhere else when signed out', async () => {
+    renderAt('/teachers', null);
+    expect(await screen.findByText('Login screen')).toBeInTheDocument();
+  });
+
+  it('shows the terms inside the console when signed in', async () => {
+    renderAt('/terms', admin);
+    expect(await screen.findByText('Terms screen')).toBeInTheDocument();
+  });
+
+  it('lets a teacher open a class overview', async () => {
+    renderAt('/my-classes/class-1', teacher);
+    expect(await screen.findByText('Class overview screen')).toBeInTheDocument();
+  });
+
+  it('keeps an admin out of the teacher class overview', async () => {
+    renderAt('/my-classes/class-1', admin);
+    expect(await screen.findByText('Dashboard screen')).toBeInTheDocument();
   });
 });

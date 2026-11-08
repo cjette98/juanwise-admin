@@ -90,7 +90,10 @@ export default function AdminLayout() {
             <strong>{user?.name ?? 'Administrator'}</strong>
             {user?.email}
           </div>
-          <a href={`${API_ORIGIN}/api/docs`} target="_blank" rel="noreferrer" style={{ color: '#fff' }}>
+          <NavLink to="/terms" className="sidebar__link">
+            Terms &amp; Conditions
+          </NavLink>
+          <a href={`${API_ORIGIN}/api/docs`} target="_blank" rel="noreferrer" className="sidebar__link">
             API docs ↗
           </a>
         </div>

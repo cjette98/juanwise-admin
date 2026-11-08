@@ -116,3 +116,10 @@ describe('AdminLayout drawer', () => {
     expect(screen.getByRole('navigation', { name: 'Main menu' })).not.toHaveClass('sidebar--open');
   });
 });
+
+describe('AdminLayout links', () => {
+  it('links to the Terms & Conditions from the sidebar', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: 'Terms & Conditions' })).toHaveAttribute('href', '/terms');
+  });
+});

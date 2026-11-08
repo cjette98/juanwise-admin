@@ -79,5 +79,17 @@ export const NAV: NavItem[] = [
   },
 ];
 
+/** Linked from the sidebar footer and the login screen rather than the menu. */
+NAV.push({
+  path: '/terms',
+  label: 'Terms & Conditions',
+  icon: '📜',
+  title: 'Terms & Conditions',
+  subtitle: 'What players, teachers and main admins agree to',
+  section: 'Manage',
+  roles: ['admin', 'teacher'],
+  hidden: true,
+});
+
 export const navForPath = (pathname: string): NavItem | undefined =>
   NAV.find((item) => (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)));
