@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { errorMessage } from '@/shared/api';
 import { images } from '@/shared/assets/images';
 import { Banner, Button, Field, Input, PasswordInput } from '@/shared/components/ui';
@@ -82,6 +83,10 @@ export default function LoginScreen() {
           <Button type="submit" block busy={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
+
+          <p className="card__hint" style={{ textAlign: 'center' }}>
+            By signing in you agree to the <Link to="/terms">Terms &amp; Conditions</Link>.
+          </p>
         </form>
       </main>
     </div>

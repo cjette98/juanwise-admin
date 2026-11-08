@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Badge, Banner, Button, Card, Empty, Input, Loading, Select } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, DataTable, Empty, Input, Loading, Select } from '@/shared/components/ui';
 import { formatDateTime, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
 import { teacherForStudent, useDirectory } from '@/features/directory/use-directory';
 import {
@@ -105,8 +105,7 @@ export default function StudentsScreen() {
             }
           />
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          <DataTable>
               <thead>
                 <tr>
                   <th>Student</th>
@@ -167,8 +166,7 @@ export default function StudentsScreen() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </DataTable>
         )}
       </Card>
       <AccountActionDialogs actions={actions} />

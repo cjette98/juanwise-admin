@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { ApiClass } from '@/shared/api';
-import { Badge, Banner, Button, Card, Empty, Input, Loading } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, DataTable, Empty, Input, Loading } from '@/shared/components/ui';
 import { formatDate, formatDateTime, gradeSection, matchesSearch, sectionNote } from '@/shared/lib/format';
 import { categoryLabel } from '@/shared/theme/colors';
 import { useDirectory } from '@/features/directory/use-directory';
@@ -82,8 +82,7 @@ export default function TeachersScreen() {
             }
           />
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          <DataTable>
               <thead>
                 <tr>
                   <th style={{ width: 32 }} />
@@ -152,8 +151,7 @@ export default function TeachersScreen() {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+            </DataTable>
         )}
       </Card>
       <AccountActionDialogs actions={actions} />

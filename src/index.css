@@ -31,11 +31,40 @@
   --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
   --sidebar-width: 248px;
 
+  /*
+   * The game's type system (juanwise-app-v2 `shared/theme/tokens.ts`, item 3 of
+   * Adjustment 3): Baloo 2 for headings and buttons, Nunito for body copy and
+   * labels, at the app's sizes. The client asked for one font and one scale
+   * "from the first screen to the last", on the phone and on this console.
+   */
+  --font-display: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  /* size / line-height pairs, named after the app's text variants */
+  --type-display: 34px;
+  --type-display-lh: 38px;
+  --type-h1: 24px;
+  --type-h1-lh: 28px;
+  --type-h2: 19px;
+  --type-h2-lh: 23px;
+  --type-h3: 17px;
+  --type-h3-lh: 21px;
+  --type-body: 15px;
+  --type-body-lh: 23px;
+  --type-body-strong: 16.5px;
+  --type-label: 12px;
+  --type-label-lh: 16px;
+  --type-caption: 12.5px;
+  --type-caption-lh: 17px;
+
+  --page-pad-x: 28px;
+  --page-pad-y: 24px;
+
   color-scheme: light;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
   color: var(--ink);
 }
 
@@ -60,18 +89,29 @@ h2,
 h3,
 h4 {
   margin: 0;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
   font-weight: 700;
+  letter-spacing: 0;
 }
 
 h1 {
-  font-size: 24px;
+  font-size: var(--type-h1);
+  line-height: var(--type-h1-lh);
+  font-weight: 800;
 }
 h2 {
-  font-size: 18px;
+  font-size: var(--type-h2);
+  line-height: var(--type-h2-lh);
 }
-h3 {
-  font-size: 15px;
+h3,
+h4 {
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
+}
+
+strong,
+b {
+  font-weight: 800;
 }
 
 p {
@@ -127,7 +167,8 @@ textarea {
 }
 
 .sidebar__title {
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
   font-weight: 800;
   line-height: 1.15;
 }
@@ -141,12 +182,13 @@ textarea {
 }
 
 .sidebar__section {
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 15px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: rgba(255, 255, 255, 0.55);
   padding: 16px 10px 6px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .navlink {
@@ -157,8 +199,8 @@ textarea {
   border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.82);
   text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--type-body);
+  font-weight: 700;
 }
 
 .navlink:hover {
@@ -187,6 +229,14 @@ textarea {
   gap: 8px;
 }
 
+.sidebar__link {
+  color: #fff;
+}
+
+.sidebar__link.active {
+  color: var(--gold);
+}
+
 .sidebar__footer strong {
   display: block;
   color: #fff;
@@ -203,7 +253,7 @@ textarea {
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 16px 28px;
+  padding: 16px var(--page-pad-x);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -212,9 +262,52 @@ textarea {
   z-index: 5;
 }
 
+.topbar__heading {
+  min-width: 0;
+}
+
+/* The drawer's handle; only shown once the sidebar stops fitting. */
+.topbar__menu,
+.sidebar__close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sidebar__close {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  font-size: 15px;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+}
+
+.topbar__menu:focus-visible,
+.sidebar__close:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.drawer-backdrop {
+  display: none;
+}
+
 .topbar__subtitle {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   margin-top: 2px;
 }
 
@@ -226,7 +319,7 @@ textarea {
 }
 
 .content {
-  padding: 24px 28px 64px;
+  padding: var(--page-pad-y) var(--page-pad-x) 64px;
   display: grid;
   gap: 20px;
   align-content: start;
@@ -245,6 +338,7 @@ textarea {
   padding: 16px 18px;
   border-bottom: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
@@ -255,16 +349,20 @@ textarea {
 
 .card__hint {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   margin-top: 2px;
 }
 
 .card__actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card__body {
@@ -277,11 +375,11 @@ textarea {
 }
 
 .grid--2 {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 
 .grid--stats {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
 }
 
 .row {
@@ -303,22 +401,24 @@ textarea {
 }
 
 .stat__label {
-  font-size: 12px;
+  font-size: var(--type-label);
+  line-height: var(--type-label-lh);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .stat__value {
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-size: var(--type-display);
+  line-height: var(--type-display-lh);
   font-weight: 800;
-  letter-spacing: -0.03em;
   margin-top: 6px;
 }
 
 .stat__hint {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--muted);
   margin-top: 2px;
 }
@@ -330,9 +430,11 @@ textarea {
   gap: 7px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  line-height: 22px;
+  font-weight: 700;
   cursor: pointer;
   background: var(--blue);
   color: #fff;
@@ -377,8 +479,9 @@ textarea {
 }
 
 .btn--sm {
-  padding: 5px 10px;
-  font-size: 13px;
+  padding: 4px 10px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .btn--block {
@@ -391,17 +494,18 @@ textarea {
 }
 
 .field__label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 800;
 }
 
 .field__hint {
-  font-size: 12px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   color: var(--muted);
 }
 
 .field__error {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--red);
   font-weight: 600;
 }
@@ -410,6 +514,8 @@ textarea {
 .select,
 .textarea {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
@@ -551,11 +657,12 @@ textarea {
 
 .table th {
   text-align: left;
-  font-size: 12px;
+  font-size: var(--type-label);
+  line-height: var(--type-label-lh);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.09em;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--canvas);
@@ -577,17 +684,22 @@ textarea {
 }
 
 .table__primary {
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .table__sub {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--type-caption);
 }
 
 .table__num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* `.table th` would otherwise pull numeric headers left of their numbers. */
+.table th.table__num {
+  text-align: right;
 }
 
 .rank {
@@ -601,6 +713,21 @@ textarea {
   font-weight: 800;
   background: var(--canvas);
   border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.rank-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rank__tie {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -622,6 +749,57 @@ textarea {
   color: #6b4420;
 }
 
+/* A one-line "How ranking works" note under a leaderboard. */
+.ranking-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--blue-tint);
+  color: var(--blue-dark);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+
+.ranking-note strong {
+  white-space: nowrap;
+}
+
+/* A student's progress in the Class Overview: "8/30 · 1 level done" over a bar. */
+.progress-cell {
+  display: grid;
+  gap: 5px;
+  min-width: 140px;
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: inherit;
+}
+
+@media (max-width: 720px) {
+  .progress-cell {
+    min-width: 0;
+    width: 60%;
+    justify-items: end;
+  }
+
+  .progress-cell .progress-bar {
+    width: 100%;
+  }
+}
+
 /* ------------------------------------------------------------------- states */
 
 .empty {
@@ -635,6 +813,9 @@ textarea {
 }
 
 .empty__title {
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
   font-weight: 700;
   color: var(--ink);
   margin-top: 8px;
@@ -716,11 +897,11 @@ textarea {
 }
 
 .login__headline {
-  font-size: 32px;
+  font-family: var(--font-display);
+  font-size: var(--type-display);
   font-weight: 800;
-  letter-spacing: -0.03em;
   max-width: 15ch;
-  line-height: 1.15;
+  line-height: var(--type-display-lh);
 }
 
 .login__blurb {
@@ -761,9 +942,23 @@ textarea {
   .login__art {
     padding: 32px;
   }
-  .sidebar {
-    position: static;
-    height: auto;
+}
+
+@media (max-width: 520px) {
+  .login__art {
+    padding: 24px 20px;
+    gap: 12px;
+  }
+  .login__logo {
+    width: 56px;
+    height: 56px;
+  }
+  .login__headline {
+    font-size: var(--type-h1);
+    line-height: var(--type-h1-lh);
+  }
+  .login__panel {
+    padding: 24px 16px;
   }
 }
 
@@ -782,7 +977,8 @@ textarea {
 }
 
 .jigsaw-overview h2 {
-  font-size: 22px;
+  font-size: var(--type-h1);
+  line-height: var(--type-h1-lh);
 }
 
 .jigsaw-overview p {
@@ -859,7 +1055,7 @@ textarea {
 
 .jigsaw-workspace {
   display: grid;
-  grid-template-columns: minmax(420px, 0.92fr) minmax(460px, 1.08fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   gap: 18px;
   align-items: start;
 }
@@ -1013,7 +1209,7 @@ textarea {
   }
 
   .jigsaw-workspace__editor .grid--2 {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   }
 }
 
@@ -1199,14 +1395,34 @@ textarea {
   color: var(--blue);
 }
 
+/* Fluid: as wide as the column allows, up to the 320px it is drawn at. The
+   picture inside is laid out at 320 and scaled to fit (jigsaw-cropper.tsx). */
 .cropper {
   position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--canvas);
   touch-action: none;
   user-select: none;
+}
+
+.cropper__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 320px;
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+
+.cropper__zoom {
+  width: 100%;
+  max-width: 320px;
 }
 
 .cropper img {
@@ -1299,8 +1515,10 @@ textarea {
   background: transparent;
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 700;
   color: var(--muted);
   cursor: pointer;
 }
@@ -1336,8 +1554,9 @@ textarea {
 
 .dialog__title {
   margin: 0 0 10px;
-  font-size: 17px;
-  font-weight: 650;
+  font-size: var(--type-h2);
+  line-height: var(--type-h2-lh);
+  font-weight: 700;
 }
 
 .dialog__body {
@@ -1386,8 +1605,10 @@ textarea {
 .quiz-section__legend {
   margin: 0 0 4px;
   padding: 0;
-  font-size: 13px;
-  font-weight: 650;
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
+  font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--ink);
 }
@@ -1455,7 +1676,7 @@ textarea {
 
 .quiz-type__name {
   grid-area: name;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .quiz-type__desc {
@@ -1463,4 +1684,289 @@ textarea {
   font-size: 12.5px;
   line-height: 1.4;
   color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- responsive */
+
+/*
+ * Item 4 of Adjustment 3: the console has to work on a phone as well as a
+ * laptop. Below ~900px the sidebar becomes a drawer behind a menu button; below
+ * 720px tables become stacked cards; below 640px the page gutters shrink and
+ * card toolbars take the full width.
+ */
+@media (max-width: 900px) {
+  :root {
+    --page-pad-x: 20px;
+    --page-pad-y: 18px;
+  }
+
+  .topbar__menu,
+  .sidebar__close {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    height: 100vh;
+    height: 100dvh;
+    width: min(var(--sidebar-width), 86vw);
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 200ms ease,
+      visibility 0s linear 200ms;
+  }
+
+  .sidebar--open {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 0 40px rgba(16, 24, 40, 0.35);
+    transition: transform 200ms ease;
+  }
+
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(16, 24, 40, 0.45);
+  }
+
+  .topbar {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    gap: 12px;
+  }
+
+  .content {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .table--stack thead {
+    display: none;
+  }
+
+  .table--stack,
+  .table--stack tbody,
+  .table--stack tr,
+  .table--stack td {
+    display: block;
+    width: 100%;
+  }
+
+  .table--stack tr {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table--stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table--stack td,
+  .table--stack tr:last-child td {
+    border: 0;
+    padding: 4px 0;
+  }
+
+  .table--stack td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+
+  .table--stack td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    text-align: left;
+    font-size: var(--type-label);
+    line-height: var(--type-label-lh);
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* An empty cell has nothing to say next to its label. */
+  .table--stack td[data-label]:empty {
+    display: none;
+  }
+
+  .table--stack .row,
+  .table--stack .row--tight {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .table--stack td:not([data-label]) .row {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad-x: 12px;
+    --page-pad-y: 14px;
+  }
+
+  h1 {
+    font-size: 21px;
+    line-height: 25px;
+  }
+
+  .topbar__subtitle {
+    display: none;
+  }
+
+  .card__header {
+    padding: 14px;
+  }
+
+  .card__body {
+    padding: 14px;
+  }
+
+  .card__actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Toolbar inputs were drawn at fixed desktop widths; let them share the row. */
+  .card__actions > .input,
+  .card__actions > .select,
+  .row > .input,
+  .row > .select {
+    flex: 1 1 140px;
+    width: auto !important;
+  }
+
+  .pill-tabs {
+    max-width: 100%;
+  }
+
+  /* Two stats to a row rather than one tall column of them. */
+  .grid--stats {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+  }
+
+  .stat {
+    padding: 12px 14px;
+  }
+
+  .dialog {
+    padding: 18px;
+  }
+}
+
+.card > .ranking-note:last-child {
+  border-bottom: 0;
+  border-radius: inherit;
+}
+
+/* -------------------------------------------------------------------- terms */
+
+.terms {
+  display: grid;
+  gap: 22px;
+  max-width: 76ch;
+}
+
+.terms .pill-tabs {
+  justify-self: start;
+}
+
+.terms section {
+  display: grid;
+  gap: 10px;
+}
+
+.terms h3 {
+  margin-top: 6px;
+  font-size: var(--type-label);
+  line-height: var(--type-label-lh);
+  font-family: var(--font-body);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  color: var(--blue);
+}
+
+.terms__block {
+  display: grid;
+  gap: 6px;
+}
+
+.terms ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.terms__notice {
+  color: var(--red);
+  font-size: var(--type-caption);
+}
+
+.terms-page {
+  min-height: 100vh;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 24px var(--page-pad-x) 64px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.terms-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.terms-page__header img {
+  border-radius: 10px;
+}
+
+.terms-page__back {
+  margin-left: auto;
+  font-weight: 800;
+}
+
+/* A checkbox with a label and a hint beside it. */
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: 0 0 18px;
+  accent-color: var(--blue);
+}
+
+.check > span {
+  display: grid;
+  gap: 2px;
+}
+
+.check__label {
+  font-weight: 800;
 }

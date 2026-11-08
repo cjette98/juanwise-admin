@@ -5,6 +5,7 @@ import type {
   ApiCategory,
   ApiCategoryKey,
   ApiClass,
+  ApiClassProgression,
   ApiClassMember,
   ApiContentSettings,
   ApiCurrentUser,
@@ -12,11 +13,13 @@ import type {
   ApiJigsawItem,
   ApiJigsawPieceCount,
   ApiLeaderboard,
+  ApiLeaderboardBoard,
   ApiPack,
   ApiQuestion,
   ApiSession,
   ApiUserProfile,
   AssignPackRequest,
+  CreateClassRequest,
   JigsawItemInput,
   ListUsersQuery,
   LoginRequest,
@@ -121,6 +124,21 @@ export const classesApi = {
 
   mine(): Promise<ApiClass[]> {
     return request<{ items: ApiClass[] }>('/classes/mine').then((r) => r.items);
+  },
+
+  /**
+   * The same `POST /classes` the app uses, so a class made here is the one the
+   * app shows (item 4 of Adjustment 3). Teacher only.
+   */
+  create(input: CreateClassRequest): Promise<ApiClass> {
+    return request('/classes', { method: 'POST', body: input });
+  },
+
+  /** A soft removal: the student leaves the roster, their past results stay theirs. */
+  removeMember(id: string, uid: string): Promise<void> {
+    return request(`/classes/${encodeURIComponent(id)}/members/${encodeURIComponent(uid)}`, {
+      method: 'DELETE',
+    });
   },
 
   /** Inactive classes only: an empty roster and no recorded results. */
@@ -315,17 +333,32 @@ export const packsApi = {
 /* --------------------------------------------------------------- analytics */
 
 export const analyticsApi = {
+  /**
+   * `board` picks the ranking; left out, the API follows the activity type
+   * (jigsaw → time, otherwise points). An API from before the ranking change
+   * ignores it and ranks by points.
+   */
   leaderboard(
     classId: string,
     filter: AnalyticsFilter = {},
     limit = 10,
+    board?: ApiLeaderboardBoard,
   ): Promise<ApiLeaderboard> {
-    return request('/analytics/leaderboard', { query: { classId, ...filter, limit } });
+    return request('/analytics/leaderboard', { query: { classId, ...filter, board, limit } });
   },
 
   /** Registered students with no class — juanwise-be `GET /analytics/leaderboard/guests`. */
-  guestLeaderboard(filter: AnalyticsFilter = {}, limit = 50): Promise<ApiGuestLeaderboard> {
-    return request('/analytics/leaderboard/guests', { query: { ...filter, limit } });
+  guestLeaderboard(
+    filter: AnalyticsFilter = {},
+    limit = 50,
+    board?: ApiLeaderboardBoard,
+  ): Promise<ApiGuestLeaderboard> {
+    return request('/analytics/leaderboard/guests', { query: { ...filter, board, limit } });
+  },
+
+  /** One row per active roster member, including those who have not started. Teacher only. */
+  progression(classId: string, filter: AnalyticsFilter = {}): Promise<ApiClassProgression> {
+    return request('/analytics/progression', { query: { classId, ...filter } });
   },
 };
 

@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   classesApi,
   errorMessage,
   packsApi,
   type ApiClass,
   type AssignPackRequest,
+  type CreateClassRequest,
 } from '@/shared/api';
-import { Badge, Banner, Button, Card, Empty, Loading } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, DataTable, Empty, Loading } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { useAuth } from '@/features/auth/auth-context';
 import { AssignPackDialog } from './assign-pack-dialog';
+import { CreateClassDialog } from './create-class-dialog';
 
 /**
  * A teacher's own classes and which content pack each one is currently
@@ -36,6 +39,8 @@ export default function MyClassesScreen() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [assigningClass, setAssigningClass] = useState<ApiClass | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<ApiClass | null>(null);
 
   const classes = data?.classes ?? [];
   const packs = data?.packs ?? [];
@@ -63,6 +68,13 @@ export default function MyClassesScreen() {
     return result;
   };
 
+  const createClass = async (input: CreateClassRequest): Promise<ApiClass> => {
+    const klass = await classesApi.create(input);
+    setCreated(klass);
+    reload();
+    return klass;
+  };
+
   if (loading) return <Loading label="Loading your classes…" />;
   if (error) {
     return (
@@ -80,9 +92,14 @@ export default function MyClassesScreen() {
       title={`My classes (${rows.length})`}
       hint="The content pack each of your classes is currently playing"
       actions={
-        <Button variant="secondary" small onClick={reload}>
-          Refresh
-        </Button>
+        <>
+          <Button variant="secondary" small onClick={reload}>
+            Refresh
+          </Button>
+          <Button small onClick={() => setCreating(true)}>
+            Create class
+          </Button>
+        </>
       }
       bodyless
     >
@@ -92,15 +109,23 @@ export default function MyClassesScreen() {
         </div>
       )}
 
+      {created && (
+        <div style={{ padding: '12px 14px 0' }}>
+          <Banner tone="success">
+            Created {created.name}. Students join with the code{' '}
+            <Badge tone="code">{created.code}</Badge>.
+          </Banner>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <Empty
           icon="🏫"
           title="No classes yet"
-          hint="Create a class in the JuanWise app to see it here."
+          hint="Create your first class with the Create class button — it shows up in the JuanWise app too."
         />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
+        <DataTable>
             <thead>
               <tr>
                 <th>Class</th>
@@ -116,7 +141,9 @@ export default function MyClassesScreen() {
                 return (
                   <tr key={klass.id}>
                     <td>
-                      <div className="table__primary">{klass.name}</div>
+                      <Link to={`/my-classes/${klass.id}`} className="table__primary">
+                        {klass.name}
+                      </Link>
                       <div className="table__sub">
                         {[klass.gradeLevel ? `Grade ${klass.gradeLevel}` : null, klass.section]
                           .filter(Boolean)
@@ -141,6 +168,11 @@ export default function MyClassesScreen() {
                     </td>
                     <td>
                       <div className="row">
+                        <Link to={`/my-classes/${klass.id}`}>
+                          <Button variant="secondary" small>
+                            Overview
+                          </Button>
+                        </Link>
                         <Button small onClick={() => setAssigningClass(klass)}>
                           {klass.packId ? 'Change pack' : 'Assign a pack'}
                         </Button>
@@ -160,9 +192,10 @@ export default function MyClassesScreen() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </DataTable>
       )}
+
+      <CreateClassDialog open={creating} onClose={() => setCreating(false)} onCreate={createClass} />
 
       {assigningClass && (
         <AssignPackDialog

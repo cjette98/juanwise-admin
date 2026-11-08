@@ -7,6 +7,8 @@ export interface NavItem {
   subtitle: string;
   section: 'Manage' | 'Content';
   roles: ('admin' | 'teacher')[];
+  /** A page with a top-bar title but no sidebar link of its own. */
+  hidden?: boolean;
 }
 
 export const NAV: NavItem[] = [
@@ -42,7 +44,7 @@ export const NAV: NavItem[] = [
     label: 'Leaderboard',
     icon: '🏆',
     title: 'Leaderboard',
-    subtitle: 'Guests, and the top 10 of every class',
+    subtitle: 'Quiz ranked by points, jigsaw by time — guests, and the top 10 of every class',
     section: 'Manage',
     roles: ['admin'],
   },
@@ -56,6 +58,17 @@ export const NAV: NavItem[] = [
     roles: ['admin', 'teacher'],
   },
   {
+    // Before `/my-classes` so `navForPath` finds it first.
+    path: '/my-classes/',
+    label: 'Class Overview',
+    icon: '🏫',
+    title: 'Class Overview',
+    subtitle: 'The roster, and how far each student has got',
+    section: 'Manage',
+    roles: ['teacher'],
+    hidden: true,
+  },
+  {
     path: '/my-classes',
     label: 'My Classes',
     icon: '🏫',
@@ -65,6 +78,18 @@ export const NAV: NavItem[] = [
     roles: ['teacher'],
   },
 ];
+
+/** Linked from the sidebar footer and the login screen rather than the menu. */
+NAV.push({
+  path: '/terms',
+  label: 'Terms & Conditions',
+  icon: '📜',
+  title: 'Terms & Conditions',
+  subtitle: 'What players, teachers and main admins agree to',
+  section: 'Manage',
+  roles: ['admin', 'teacher'],
+  hidden: true,
+});
 
 export const navForPath = (pathname: string): NavItem | undefined =>
   NAV.find((item) => (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)));

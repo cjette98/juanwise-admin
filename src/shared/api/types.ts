@@ -113,6 +113,15 @@ export interface ApiClass {
   updatedAt: string | null;
 }
 
+/** `POST /classes` — juanwise-be `createClassSchema`. The code is generated when omitted. */
+export interface CreateClassRequest {
+  name: string;
+  /** "1"–"12". */
+  gradeLevel?: string;
+  /** Letters and digits only, at most 40. */
+  section?: string;
+}
+
 export interface ApiClassMember {
   uid: string;
   name: string;
@@ -305,12 +314,27 @@ export interface AssignPackRequest {
 
 /* --------------------------------------------------------------- analytics */
 
+/**
+ * Which ranking a leaderboard uses (juanwise-be `LEADERBOARD_BOARDS`, items 6–8
+ * of Adjustment 3). `points`: points, then less total time, then fewer failed
+ * attempts. `time`: lowest average time per completed activity, then more
+ * points, then fewer failed attempts.
+ */
+export type ApiLeaderboardBoard = 'points' | 'time';
+
 export interface ApiStudentSummary {
   uid: string;
   studentName: string;
   totalPoints: number;
   totalTimeSec: number;
   activitiesCompleted: number;
+  /**
+   * Failed or timed-out attempts, retries included. Optional because an API
+   * from before the ranking change (juanwise-be PR #11) does not send it.
+   */
+  failedAttempts?: number;
+  /** Average seconds per completed activity; null with nothing completed. Same caveat. */
+  avgTimeSec?: number | null;
   goldMedals: number;
   silverMedals: number;
   bronzeMedals: number;
@@ -319,10 +343,13 @@ export interface ApiStudentSummary {
   completionPct: number;
 }
 
+/** `rank` is shared by fully tied players (1, 1, 3) on the current API. */
 export type ApiRankedStudent = ApiStudentSummary & { rank: number };
 
 export interface ApiLeaderboard {
   classId: string;
+  /** Absent on an API from before the ranking change. */
+  board?: ApiLeaderboardBoard;
   items: ApiRankedStudent[];
   maxPoints: number;
   maxTimeSec: number;
@@ -330,9 +357,30 @@ export interface ApiLeaderboard {
 
 /** `GET /analytics/leaderboard/guests` — no class, so no `classId`. */
 export interface ApiGuestLeaderboard {
+  board?: ApiLeaderboardBoard;
   items: ApiRankedStudent[];
   maxPoints: number;
   maxTimeSec: number;
+}
+
+/** `GET /analytics/progression` — juanwise-be `StudentProgression`. */
+export interface ApiStudentProgression {
+  uid: string;
+  studentName: string;
+  activitiesCompleted: number;
+  totalActivities: number;
+  levelsCompleted: number;
+  currentLevel: number;
+  totalPoints: number;
+  totalTimeSec: number;
+  percent: number;
+  trophy: ApiTrophy;
+  pace: ApiPace;
+}
+
+export interface ApiClassProgression {
+  classId: string;
+  items: ApiStudentProgression[];
 }
 
 export interface AnalyticsFilter {

@@ -83,3 +83,43 @@ describe('AdminLayout sign out', () => {
     expect(screen.getByRole('dialog', { hidden: true })).not.toHaveAttribute('open');
   });
 });
+
+describe('AdminLayout drawer', () => {
+  it('opens the menu from the top bar and closes it again', async () => {
+    const { user } = renderLayout();
+    const menuButton = screen.getByRole('button', { name: 'Open menu' });
+    const sidebar = screen.getByRole('navigation', { name: 'Main menu' });
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar).not.toHaveClass('sidebar--open');
+
+    await user.click(menuButton);
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebar).toHaveClass('sidebar--open');
+
+    await user.click(screen.getByRole('button', { name: 'Close menu' }));
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar).not.toHaveClass('sidebar--open');
+  });
+
+  it('closes on Escape', async () => {
+    const { user } = renderLayout();
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('navigation', { name: 'Main menu' })).not.toHaveClass('sidebar--open');
+  });
+
+  it('closes once a menu link is followed', async () => {
+    const { user } = renderLayout();
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('link', { name: /Teachers/ }));
+    expect(screen.getByRole('navigation', { name: 'Main menu' })).not.toHaveClass('sidebar--open');
+  });
+});
+
+describe('AdminLayout links', () => {
+  it('links to the Terms & Conditions from the sidebar', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: 'Terms & Conditions' })).toHaveAttribute('href', '/terms');
+  });
+});

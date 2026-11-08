@@ -21,7 +21,11 @@ import { Button, Field } from '@/shared/components/ui';
 
 /** The exported square. 1024 is plenty for a board that renders at ~320 CSS px. */
 const OUTPUT_SIZE = 1024;
-/** The on-screen editing square. */
+/**
+ * The editing square's own coordinate space. On screen it is drawn at up to
+ * this many CSS px and shrinks with its column (a 375px phone has less), so
+ * every drag is divided by the drawn size over this one.
+ */
 const VIEWPORT = 320;
 const JPEG_QUALITY = 0.9;
 
@@ -47,6 +51,23 @@ export default function JigsawCropper({
   const [mode, setMode] = useState<Mode>('fill');
   const [placement, setPlacement] = useState<Placement>({ scale: 1, x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
+  const frame = useRef<HTMLDivElement>(null);
+  /** Drawn width ÷ VIEWPORT. 1 on a desktop, under 1 on a narrow phone. */
+  const [displayScale, setDisplayScale] = useState(1);
+
+  useEffect(() => {
+    const element = frame.current;
+    if (!element) return;
+    const measure = () => {
+      const width = element.clientWidth;
+      setDisplayScale(width > 0 ? width / VIEWPORT : 1);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const drag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(
     null,
@@ -108,8 +129,8 @@ export default function JigsawCropper({
     setPlacement((current) =>
       clamp({
         ...current,
-        x: state.originX + (event.clientX - state.startX),
-        y: state.originY + (event.clientY - state.startY),
+        x: state.originX + (event.clientX - state.startX) / displayScale,
+        y: state.originY + (event.clientY - state.startY) / displayScale,
       }),
     );
   };
@@ -209,15 +230,16 @@ export default function JigsawCropper({
       </div>
 
       <div
+        ref={frame}
         className="cropper"
-        style={{ width: VIEWPORT, height: VIEWPORT, cursor: mode === 'fill' ? 'grab' : 'default' }}
+        style={{ cursor: mode === 'fill' ? 'grab' : 'default' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
         {url && image && (
-          <>
+          <div className="cropper__stage" style={{ transform: `scale(${displayScale})` }}>
             {mode === 'fit' && (
               <img src={url} alt="" className="cropper__backdrop" aria-hidden />
             )}
@@ -233,7 +255,7 @@ export default function JigsawCropper({
                 height: image.height * placement.scale,
               }}
             />
-          </>
+          </div>
         )}
         <div className="cropper__grid" aria-hidden />
       </div>
@@ -247,7 +269,7 @@ export default function JigsawCropper({
             step={(maxScale - coverScale) / 100 || 0.01}
             value={placement.scale}
             onChange={(e) => setScale(Number(e.target.value))}
-            style={{ width: VIEWPORT }}
+            className="cropper__zoom"
           />
         </Field>
       )}

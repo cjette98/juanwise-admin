@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AdminLayout from '@/app/layout';
 import { AuthProvider, useAuth } from '@/features/auth/auth-context';
 import LoginScreen from '@/features/auth/login-screen';
+import ClassOverviewScreen from '@/features/classes/class-overview-screen';
 import MyClassesScreen from '@/features/classes/my-classes-screen';
 import DashboardScreen from '@/features/dashboard/dashboard-screen';
 import JigsawScreen from '@/features/jigsaw/jigsaw-screen';
@@ -11,6 +12,7 @@ import PackListScreen from '@/features/packs/pack-list-screen';
 import QuizScreen from '@/features/quiz/quiz-screen';
 import StudentsScreen from '@/features/students/students-screen';
 import TeachersScreen from '@/features/teachers/teachers-screen';
+import TermsScreen, { PublicTermsScreen } from '@/features/terms/terms-screen';
 import { images } from '@/shared/assets/images';
 
 /** Redirects away from a route the signed-in role should not reach. */
@@ -40,7 +42,15 @@ function Gate() {
     );
   }
 
-  if (!user) return <LoginScreen />;
+  // Signed out, the terms are the one page besides sign-in (linked from it).
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/terms" element={<PublicTermsScreen />} />
+        <Route path="*" element={<LoginScreen />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
@@ -79,6 +89,15 @@ function Gate() {
             </RequireRole>
           }
         />
+        <Route
+          path="/my-classes/:classId"
+          element={
+            <RequireRole role="teacher">
+              <ClassOverviewScreen />
+            </RequireRole>
+          }
+        />
+        <Route path="/terms" element={<TermsScreen />} />
         <Route path="/packs/:packId/quiz" element={<QuizScreen />} />
         <Route path="/packs/:packId/jigsaw" element={<JigsawScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />

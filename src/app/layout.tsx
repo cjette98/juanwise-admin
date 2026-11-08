@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { API_ORIGIN } from '@/shared/api';
 import { images } from '@/shared/assets/images';
@@ -11,9 +11,32 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   const [signingOut, setSigningOut] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  // Below ~900px the sidebar is a drawer (item 4 of Adjustment 3): a fixed
+  // 248px column left a 375px phone about 127px for the page itself.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const current = navForPath(pathname);
 
-  const visibleNav = NAV.filter((item) => user && item.roles.includes(user.role as 'admin' | 'teacher'));
+  // Following a link is the end of a trip to the menu.
+  useEffect(() => setDrawerOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    // The page behind an open drawer should not scroll under the finger.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [drawerOpen]);
+
+  const visibleNav = NAV.filter(
+    (item) => !item.hidden && user && item.roles.includes(user.role as 'admin' | 'teacher'),
+  );
   const sections = ['Manage', 'Content'] as const;
 
   const handleSignOut = async () => {
@@ -27,14 +50,26 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="shell">
-      <nav className="sidebar">
+    <div className={`shell ${drawerOpen ? 'shell--drawer-open' : ''}`}>
+      <nav
+        id="sidebar"
+        className={`sidebar ${drawerOpen ? 'sidebar--open' : ''}`}
+        aria-label="Main menu"
+      >
         <div className="sidebar__brand">
           <img className="sidebar__logo" src={images.appIcon} alt="" />
           <div>
             <div className="sidebar__title">JuanWise</div>
             <div className="sidebar__subtitle">Admin</div>
           </div>
+          <button
+            type="button"
+            className="sidebar__close"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
         </div>
 
         {sections.map((section) => (
@@ -61,15 +96,32 @@ export default function AdminLayout() {
             <strong>{user?.name ?? 'Administrator'}</strong>
             {user?.email}
           </div>
-          <a href={`${API_ORIGIN}/api/docs`} target="_blank" rel="noreferrer" style={{ color: '#fff' }}>
+          <NavLink to="/terms" className="sidebar__link">
+            Terms &amp; Conditions
+          </NavLink>
+          <a href={`${API_ORIGIN}/api/docs`} target="_blank" rel="noreferrer" className="sidebar__link">
             API docs ↗
           </a>
         </div>
       </nav>
 
+      {drawerOpen && (
+        <div className="drawer-backdrop" aria-hidden onClick={() => setDrawerOpen(false)} />
+      )}
+
       <div className="main">
         <header className="topbar">
-          <div>
+          <button
+            type="button"
+            className="topbar__menu"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={drawerOpen}
+            aria-controls="sidebar"
+          >
+            <span aria-hidden>☰</span>
+          </button>
+          <div className="topbar__heading">
             <h1>{current?.title ?? 'JuanWise Admin'}</h1>
             {current?.subtitle && <div className="topbar__subtitle">{current.subtitle}</div>}
           </div>
