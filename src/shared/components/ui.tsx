@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 /**
@@ -172,6 +172,60 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`select ${props.className ?? ''}`} />;
+}
+
+/* ------------------------------------------------------------------- table */
+
+/**
+ * Copies each column's header onto its cells as `data-label`, so the narrow
+ * layout in `index.css` can show a row as a stacked card ("Points  120")
+ * without every screen repeating its column names in the markup. A cell that
+ * spans several columns (an expanded detail row) is left unlabelled and runs
+ * the full width of the card.
+ */
+export function labelTableCells(table: HTMLTableElement): void {
+  const headers = Array.from(table.tHead?.rows[0]?.cells ?? []).map(
+    (cell) => cell.textContent?.trim() ?? '',
+  );
+  for (const body of Array.from(table.tBodies)) {
+    for (const row of Array.from(body.rows)) {
+      let column = 0;
+      for (const cell of Array.from(row.cells)) {
+        const label = cell.colSpan > 1 ? '' : (headers[column] ?? '');
+        if (label) cell.setAttribute('data-label', label);
+        else cell.removeAttribute('data-label');
+        column += cell.colSpan || 1;
+      }
+    }
+  }
+}
+
+/**
+ * A data table that turns into a stack of cards on a phone (item 4 of
+ * Adjustment 3). Wide screens get the same scrolling table as before.
+ */
+export function DataTable({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLTableElement>(null);
+
+  useLayoutEffect(() => {
+    const table = ref.current;
+    if (!table) return;
+    labelTableCells(table);
+    // Rows rendered by their own stateful components (an expanding detail
+    // row) change without this component re-rendering.
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(() => labelTableCells(table));
+    observer.observe(table, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  });
+
+  return (
+    <div className="table-wrap">
+      <table ref={ref} className={`table table--stack ${className}`.trim()}>
+        {children}
+      </table>
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ status */

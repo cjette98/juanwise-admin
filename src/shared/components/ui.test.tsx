@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { ConfirmDialog } from './ui';
+import { ConfirmDialog, DataTable } from './ui';
 
 const renderDialog = (over: Partial<Parameters<typeof ConfirmDialog>[0]> = {}) => {
   const onConfirm = vi.fn();
@@ -67,5 +67,37 @@ describe('ConfirmDialog', () => {
     fireEvent(dialog, event);
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(event.defaultPrevented).toBe(true);
+  });
+});
+
+describe('DataTable', () => {
+  it('labels each cell with its column so a phone can stack the row', () => {
+    render(
+      <DataTable>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Points</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Juan</td>
+            <td>120</td>
+            <td>actions</td>
+          </tr>
+          <tr>
+            <td colSpan={3}>details</td>
+          </tr>
+        </tbody>
+      </DataTable>,
+    );
+
+    expect(screen.getByText('Juan')).toHaveAttribute('data-label', 'Student');
+    expect(screen.getByText('120')).toHaveAttribute('data-label', 'Points');
+    expect(screen.getByText('actions')).not.toHaveAttribute('data-label');
+    expect(screen.getByText('details')).not.toHaveAttribute('data-label');
+    expect(screen.getByRole('table')).toHaveClass('table--stack');
   });
 });

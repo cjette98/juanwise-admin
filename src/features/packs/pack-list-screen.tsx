@@ -1,17 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage, packsApi, type ApiPack, type ApiPackStatus } from '@/shared/api';
-import {
-  Badge,
-  Banner,
-  Button,
-  Card,
-  ConfirmDialog,
-  Empty,
-  Field,
-  Input,
-  Loading,
-} from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, ConfirmDialog, DataTable, Empty, Field, Input, Loading } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { matchesSearch } from '@/shared/lib/format';
 import { useAuth } from '@/features/auth/auth-context';
@@ -147,8 +137,7 @@ export default function PackListScreen() {
           }
         />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
+        <DataTable>
             <thead>
               <tr>
                 <th>Pack</th>
@@ -236,8 +225,7 @@ export default function PackListScreen() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </DataTable>
       )}
 
       <NewPackDialog open={newPackOpen} onClose={() => setNewPackOpen(false)} onCreate={createPack} />

@@ -245,13 +245,55 @@ textarea {
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 16px 28px;
+  padding: 16px var(--page-pad-x);
   display: flex;
   align-items: center;
   gap: 16px;
   position: sticky;
   top: 0;
   z-index: 5;
+}
+
+.topbar__heading {
+  min-width: 0;
+}
+
+/* The drawer's handle; only shown once the sidebar stops fitting. */
+.topbar__menu,
+.sidebar__close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sidebar__close {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  font-size: 15px;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+}
+
+.topbar__menu:focus-visible,
+.sidebar__close:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.drawer-backdrop {
+  display: none;
 }
 
 .topbar__subtitle {
@@ -269,7 +311,7 @@ textarea {
 }
 
 .content {
-  padding: 24px 28px 64px;
+  padding: var(--page-pad-y) var(--page-pad-x) 64px;
   display: grid;
   gap: 20px;
   align-content: start;
@@ -288,6 +330,7 @@ textarea {
   padding: 16px 18px;
   border-bottom: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
@@ -306,9 +349,12 @@ textarea {
 .card__actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card__body {
@@ -321,11 +367,11 @@ textarea {
 }
 
 .grid--2 {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 
 .grid--stats {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
 }
 
 .row {
@@ -460,6 +506,8 @@ textarea {
 .select,
 .textarea {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
@@ -815,9 +863,23 @@ textarea {
   .login__art {
     padding: 32px;
   }
-  .sidebar {
-    position: static;
-    height: auto;
+}
+
+@media (max-width: 520px) {
+  .login__art {
+    padding: 24px 20px;
+    gap: 12px;
+  }
+  .login__logo {
+    width: 56px;
+    height: 56px;
+  }
+  .login__headline {
+    font-size: var(--type-h1);
+    line-height: var(--type-h1-lh);
+  }
+  .login__panel {
+    padding: 24px 16px;
   }
 }
 
@@ -914,7 +976,7 @@ textarea {
 
 .jigsaw-workspace {
   display: grid;
-  grid-template-columns: minmax(420px, 0.92fr) minmax(460px, 1.08fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   gap: 18px;
   align-items: start;
 }
@@ -1068,7 +1130,7 @@ textarea {
   }
 
   .jigsaw-workspace__editor .grid--2 {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   }
 }
 
@@ -1254,14 +1316,34 @@ textarea {
   color: var(--blue);
 }
 
+/* Fluid: as wide as the column allows, up to the 320px it is drawn at. The
+   picture inside is laid out at 320 and scaled to fit (jigsaw-cropper.tsx). */
 .cropper {
   position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--canvas);
   touch-action: none;
   user-select: none;
+}
+
+.cropper__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 320px;
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+
+.cropper__zoom {
+  width: 100%;
+  max-width: 320px;
 }
 
 .cropper img {
@@ -1523,4 +1605,178 @@ textarea {
   font-size: 12.5px;
   line-height: 1.4;
   color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- responsive */
+
+/*
+ * Item 4 of Adjustment 3: the console has to work on a phone as well as a
+ * laptop. Below ~900px the sidebar becomes a drawer behind a menu button; below
+ * 720px tables become stacked cards; below 640px the page gutters shrink and
+ * card toolbars take the full width.
+ */
+@media (max-width: 900px) {
+  :root {
+    --page-pad-x: 20px;
+    --page-pad-y: 18px;
+  }
+
+  .topbar__menu,
+  .sidebar__close {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    height: 100vh;
+    height: 100dvh;
+    width: min(var(--sidebar-width), 86vw);
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 200ms ease,
+      visibility 0s linear 200ms;
+  }
+
+  .sidebar--open {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 0 40px rgba(16, 24, 40, 0.35);
+    transition: transform 200ms ease;
+  }
+
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(16, 24, 40, 0.45);
+  }
+
+  .topbar {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    gap: 12px;
+  }
+
+  .content {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .table--stack thead {
+    display: none;
+  }
+
+  .table--stack,
+  .table--stack tbody,
+  .table--stack tr,
+  .table--stack td {
+    display: block;
+    width: 100%;
+  }
+
+  .table--stack tr {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table--stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table--stack td,
+  .table--stack tr:last-child td {
+    border: 0;
+    padding: 4px 0;
+  }
+
+  .table--stack td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+
+  .table--stack td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    text-align: left;
+    font-size: var(--type-label);
+    line-height: var(--type-label-lh);
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* An empty cell has nothing to say next to its label. */
+  .table--stack td[data-label]:empty {
+    display: none;
+  }
+
+  .table--stack .row,
+  .table--stack .row--tight {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .table--stack td:not([data-label]) .row {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad-x: 12px;
+    --page-pad-y: 14px;
+  }
+
+  h1 {
+    font-size: 21px;
+    line-height: 25px;
+  }
+
+  .topbar__subtitle {
+    display: none;
+  }
+
+  .card__header {
+    padding: 14px;
+  }
+
+  .card__body {
+    padding: 14px;
+  }
+
+  .card__actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Toolbar inputs were drawn at fixed desktop widths; let them share the row. */
+  .card__actions > .input,
+  .card__actions > .select,
+  .row > .input,
+  .row > .select {
+    flex: 1 1 140px;
+    width: auto !important;
+  }
+
+  .pill-tabs {
+    max-width: 100%;
+  }
+
+  .dialog {
+    padding: 18px;
+  }
 }

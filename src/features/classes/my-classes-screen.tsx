@@ -6,7 +6,7 @@ import {
   type ApiClass,
   type AssignPackRequest,
 } from '@/shared/api';
-import { Badge, Banner, Button, Card, Empty, Loading } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, DataTable, Empty, Loading } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { useAuth } from '@/features/auth/auth-context';
 import { AssignPackDialog } from './assign-pack-dialog';
@@ -99,8 +99,7 @@ export default function MyClassesScreen() {
           hint="Create a class in the JuanWise app to see it here."
         />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
+        <DataTable>
             <thead>
               <tr>
                 <th>Class</th>
@@ -160,8 +159,7 @@ export default function MyClassesScreen() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </DataTable>
       )}
 
       {assigningClass && (

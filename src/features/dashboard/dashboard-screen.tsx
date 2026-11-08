@@ -1,17 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { classesApi, errorMessage, type ApiClass } from '@/shared/api';
-import {
-  Badge,
-  Banner,
-  Button,
-  Card,
-  ConfirmDialog,
-  Empty,
-  Loading,
-  Select,
-  Stat,
-} from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, ConfirmDialog, DataTable, Empty, Loading, Select, Stat } from '@/shared/components/ui';
 import { formatDate, gradeSection, sectionNote } from '@/shared/lib/format';
 import { useDirectory } from '@/features/directory/use-directory';
 
@@ -136,8 +126,7 @@ export default function DashboardScreen() {
             }
           />
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          <DataTable>
               <thead>
                 <tr>
                   <th>Class</th>
@@ -183,8 +172,7 @@ export default function DashboardScreen() {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+            </DataTable>
         )}
       </Card>
 

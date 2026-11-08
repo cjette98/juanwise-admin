@@ -6,7 +6,7 @@ import {
   type ApiClass,
   type ApiRankedStudent,
 } from '@/shared/api';
-import { Badge, Banner, Button, Card, Empty, Loading, Rank, Select } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, DataTable, Empty, Loading, Rank, Select } from '@/shared/components/ui';
 import { formatDuration, TROPHY_ICON } from '@/shared/lib/format';
 import { categoryMeta } from '@/shared/theme/colors';
 import { useAsync } from '@/shared/lib/use-async';
@@ -232,8 +232,7 @@ function ClassBoard({ klass, filter }: { klass: ApiClass; filter: AnalyticsFilte
 
 function RankTable({ rows, maxPoints }: { rows: ApiRankedStudent[]; maxPoints: number }) {
   return (
-    <div className="table-wrap">
-      <table className="table">
+    <DataTable>
         <thead>
           <tr>
             <th style={{ width: 56 }}>Rank</th>
@@ -275,7 +274,6 @@ function RankTable({ rows, maxPoints }: { rows: ApiRankedStudent[]; maxPoints: n
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </DataTable>
   );
 }
