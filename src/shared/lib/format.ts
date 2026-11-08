@@ -37,6 +37,17 @@ export function formatDuration(seconds: number | null | undefined): string {
 }
 
 /**
+ * An average time per activity. These sit under the 60-second limit, where a
+ * tenth of a second can separate two players on the Time board, so they keep
+ * one decimal (`12.5 s`); a longer one falls back to `mm:ss`.
+ */
+export function formatAverageTime(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '—';
+  if (seconds < 60) return `${(Math.round(seconds * 10) / 10).toFixed(1)} s`;
+  return formatDuration(seconds);
+}
+
+/**
  * A section as the dashboard may show it: letters and digits only (item 1.4 of
  * the client evaluation). Registration refuses anything else now, but accounts
  * created before that rule can hold spaces or punctuation, so the value is

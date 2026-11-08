@@ -4,103 +4,117 @@ import {
   type AnalyticsFilter,
   type ApiCategoryKey,
   type ApiClass,
+  type ApiLeaderboardBoard,
   type ApiRankedStudent,
 } from '@/shared/api';
 import { Badge, Banner, Button, Card, DataTable, Empty, Loading, Rank, Select } from '@/shared/components/ui';
-import { formatDuration, TROPHY_ICON } from '@/shared/lib/format';
+import { formatAverageTime, formatDuration } from '@/shared/lib/format';
 import { categoryMeta } from '@/shared/theme/colors';
 import { useAsync } from '@/shared/lib/use-async';
 import { useDirectory } from '@/features/directory/use-directory';
+import { BOARDS, boardMeta, isTied } from './ranking';
 
-type Board = 'guest' | 'classes';
+type Players = 'guest' | 'classes';
 
 const TOP_N = 10;
 
 /**
- * Two boards, because JuanWise has two kinds of player.
+ * Two kinds of player, and two boards for each.
  *
  * A guest is registered but joined no class, so there is no roster to rank them
  * against — they are ranked against each other, deployment-wide, by
  * `GET /analytics/leaderboard/guests`. A student in a class is ranked inside
- * that class, so the second board walks teacher → class → top ten and never
+ * that class, so the second view walks teacher → class → top ten and never
  * mixes two classes into one ranking.
+ *
+ * Quiz and jigsaw are ranked separately (items 6–8 of Adjustment 3): the Quiz
+ * board by points, the Jigsaw board by average time. Each passes `board` and
+ * its activity type, and shows the server's rows and ranks exactly as given.
  */
 export default function LeaderboardScreen() {
-  const [board, setBoard] = useState<Board>('guest');
+  const [players, setPlayers] = useState<Players>('guest');
+  const [board, setBoard] = useState<ApiLeaderboardBoard>('points');
   const [category, setCategory] = useState<ApiCategoryKey | ''>('');
-  const [activityType, setActivityType] = useState<'' | 'quiz' | 'jigsaw'>('');
 
+  const meta = boardMeta(board);
   const filter = useMemo<AnalyticsFilter>(
-    () => ({
-      category: category || undefined,
-      activityType: activityType || undefined,
-    }),
-    [category, activityType],
+    () => ({ category: category || undefined, activityType: meta.activityType }),
+    [category, meta.activityType],
   );
 
   return (
     <>
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <div className="pill-tabs" role="tablist">
-          <button
-            role="tab"
-            aria-selected={board === 'guest'}
-            className={`pill-tab ${board === 'guest' ? 'pill-tab--active' : ''}`}
-            onClick={() => setBoard('guest')}
-          >
-            👤 Guests
-          </button>
-          <button
-            role="tab"
-            aria-selected={board === 'classes'}
-            className={`pill-tab ${board === 'classes' ? 'pill-tab--active' : ''}`}
-            onClick={() => setBoard('classes')}
-          >
-            🏫 Assigned classes
-          </button>
+        <div className="row">
+          <div className="pill-tabs" role="tablist" aria-label="Players">
+            <button
+              role="tab"
+              aria-selected={players === 'guest'}
+              className={`pill-tab ${players === 'guest' ? 'pill-tab--active' : ''}`}
+              onClick={() => setPlayers('guest')}
+            >
+              👤 Guests
+            </button>
+            <button
+              role="tab"
+              aria-selected={players === 'classes'}
+              className={`pill-tab ${players === 'classes' ? 'pill-tab--active' : ''}`}
+              onClick={() => setPlayers('classes')}
+            >
+              🏫 Assigned classes
+            </button>
+          </div>
+
+          <div className="pill-tabs" role="tablist" aria-label="Board">
+            {BOARDS.map((item) => (
+              <button
+                key={item.board}
+                role="tab"
+                aria-selected={board === item.board}
+                className={`pill-tab ${board === item.board ? 'pill-tab--active' : ''}`}
+                onClick={() => setBoard(item.board)}
+              >
+                <span aria-hidden>{item.icon}</span> {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="row">
-          <Select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as ApiCategoryKey | '')}
-            style={{ width: 200 }}
-          >
-            <option value="">All categories</option>
-            {categoryMeta.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={activityType}
-            onChange={(e) => setActivityType(e.target.value as '' | 'quiz' | 'jigsaw')}
-            style={{ width: 150 }}
-          >
-            <option value="">Quiz &amp; Jigsaw</option>
-            <option value="quiz">Quiz only</option>
-            <option value="jigsaw">Jigsaw only</option>
-          </Select>
-        </div>
+        <Select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as ApiCategoryKey | '')}
+          style={{ width: 200 }}
+          aria-label="Category"
+        >
+          <option value="">All categories</option>
+          {categoryMeta.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
       </div>
 
-      {board === 'guest' ? <GuestBoard filter={filter} /> : <ClassBoards filter={filter} />}
+      {players === 'guest' ? (
+        <GuestBoard filter={filter} board={board} />
+      ) : (
+        <ClassBoards filter={filter} board={board} />
+      )}
     </>
   );
 }
 
 /* ------------------------------------------------------------------- guests */
 
-function GuestBoard({ filter }: { filter: AnalyticsFilter }) {
+function GuestBoard({ filter, board }: { filter: AnalyticsFilter; board: ApiLeaderboardBoard }) {
   const state = useAsync(
-    () => analyticsApi.guestLeaderboard(filter, 50),
-    [filter.category, filter.activityType],
+    () => analyticsApi.guestLeaderboard(filter, 50, board),
+    [filter.category, filter.activityType, board],
   );
 
   return (
     <Card
-      title="Guest leaderboard"
+      title={`Guest leaderboard · ${boardMeta(board).label}`}
       hint="Registered players who have not joined a class, ranked against each other"
       actions={
         <Button variant="secondary" small onClick={state.reload}>
@@ -109,6 +123,7 @@ function GuestBoard({ filter }: { filter: AnalyticsFilter }) {
       }
       bodyless
     >
+      <RankingNote board={board} />
       {state.loading ? (
         <Loading label="Ranking guests…" />
       ) : state.error ? (
@@ -119,10 +134,13 @@ function GuestBoard({ filter }: { filter: AnalyticsFilter }) {
         <Empty
           icon="👤"
           title="No guest has finished an activity yet"
-          hint="A guest appears here once they complete their first quiz or jigsaw."
+          hint={`A guest appears here once they complete their first ${filter.activityType ?? 'activity'}.`}
         />
       ) : (
-        <RankTable rows={state.data.items} maxPoints={state.data.maxPoints} />
+        <>
+          {!state.data.board && <LegacyNotice />}
+          <RankTable rows={state.data.items} board={board} />
+        </>
       )}
     </Card>
   );
@@ -130,7 +148,7 @@ function GuestBoard({ filter }: { filter: AnalyticsFilter }) {
 
 /* ------------------------------------------------------------------ classes */
 
-function ClassBoards({ filter }: { filter: AnalyticsFilter }) {
+function ClassBoards({ filter, board }: { filter: AnalyticsFilter; board: ApiLeaderboardBoard }) {
   const directory = useDirectory();
 
   if (directory.loading) return <Loading label="Loading teachers and classes…" />;
@@ -159,6 +177,9 @@ function ClassBoards({ filter }: { filter: AnalyticsFilter }) {
 
   return (
     <>
+      <Card bodyless>
+        <RankingNote board={board} />
+      </Card>
       {teachersWithClasses.map(({ teacher, classes }) => (
         <Card
           key={teacher.uid}
@@ -176,7 +197,7 @@ function ClassBoards({ filter }: { filter: AnalyticsFilter }) {
           ) : (
             <div className="grid">
               {classes.map((klass) => (
-                <ClassBoard key={klass.id} klass={klass} filter={filter} />
+                <ClassBoard key={klass.id} klass={klass} filter={filter} board={board} />
               ))}
             </div>
           )}
@@ -186,10 +207,18 @@ function ClassBoards({ filter }: { filter: AnalyticsFilter }) {
   );
 }
 
-function ClassBoard({ klass, filter }: { klass: ApiClass; filter: AnalyticsFilter }) {
+function ClassBoard({
+  klass,
+  filter,
+  board,
+}: {
+  klass: ApiClass;
+  filter: AnalyticsFilter;
+  board: ApiLeaderboardBoard;
+}) {
   const state = useAsync(
-    () => analyticsApi.leaderboard(klass.id, filter, TOP_N),
-    [klass.id, filter.category, filter.activityType],
+    () => analyticsApi.leaderboard(klass.id, filter, TOP_N, board),
+    [klass.id, filter.category, filter.activityType, board],
   );
 
   return (
@@ -222,7 +251,10 @@ function ClassBoard({ klass, filter }: { klass: ApiClass; filter: AnalyticsFilte
           hint="Rankings appear as soon as a student submits their first result."
         />
       ) : (
-        <RankTable rows={state.data.items} maxPoints={state.data.maxPoints} />
+        <>
+          {!state.data.board && <LegacyNotice />}
+          <RankTable rows={state.data.items} board={board} />
+        </>
       )}
     </div>
   );
@@ -230,50 +262,90 @@ function ClassBoard({ klass, filter }: { klass: ApiClass; filter: AnalyticsFilte
 
 /* -------------------------------------------------------------------- table */
 
-function RankTable({ rows, maxPoints }: { rows: ApiRankedStudent[]; maxPoints: number }) {
+export function RankingNote({ board }: { board: ApiLeaderboardBoard }) {
+  return (
+    <div className="ranking-note" role="note">
+      <strong>How ranking works:</strong>
+      <span>{boardMeta(board).note}</span>
+    </div>
+  );
+}
+
+/**
+ * The API this console talks to may still be the one from before the ranking
+ * change (juanwise-be PR #11): it sends no `board`, no failed attempts and no
+ * average time, and ranks every board by points. The rows still show, with a
+ * dash where a number is missing.
+ */
+function LegacyNotice() {
+  return (
+    <div className="card__body" style={{ paddingBottom: 0 }}>
+      <Banner tone="info">
+        The server has not been updated to the new ranking yet, so this board is ordered by
+        points and the failed-attempt and average-time columns are blank.
+      </Banner>
+    </div>
+  );
+}
+
+const dash = <span className="table__sub">—</span>;
+
+function failed(row: ApiRankedStudent) {
+  return row.failedAttempts === undefined ? dash : row.failedAttempts;
+}
+
+/**
+ * The rows in the order the server sent them, with the server's rank. The
+ * board's main measure comes first after the name.
+ */
+export function RankTable({ rows, board }: { rows: ApiRankedStudent[]; board: ApiLeaderboardBoard }) {
   return (
     <DataTable>
-        <thead>
+      <thead>
+        {board === 'time' ? (
           <tr>
-            <th style={{ width: 56 }}>Rank</th>
-            <th>Student</th>
+            <th style={{ width: 88 }}>Rank</th>
+            <th>Name</th>
+            <th className="table__num">Avg time</th>
             <th className="table__num">Points</th>
-            <th className="table__num">Activities</th>
-            <th className="table__num">Time</th>
-            <th>Medals</th>
-            <th>Trophy</th>
-            <th className="table__num">Progress</th>
+            <th className="table__num">Failed attempts</th>
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.uid}>
-              <td>
-                <Rank rank={row.rank} />
-              </td>
-              <td className="table__primary">{row.studentName || '(unnamed)'}</td>
-              <td className="table__num">
-                <strong>{row.totalPoints}</strong>
-                <span className="table__sub"> / {maxPoints}</span>
-              </td>
-              <td className="table__num">{row.activitiesCompleted}</td>
-              <td className="table__num">{formatDuration(row.totalTimeSec)}</td>
-              <td className="table__sub">
-                🥇 {row.goldMedals} · 🥈 {row.silverMedals} · 🥉 {row.bronzeMedals}
-              </td>
-              <td>
-                {row.trophy === 'none' ? (
-                  <span className="table__sub">—</span>
-                ) : (
-                  <Badge tone={row.trophy === 'gold' ? 'gold' : 'default'}>
-                    {TROPHY_ICON[row.trophy]} {row.trophy}
-                  </Badge>
-                )}
-              </td>
-              <td className="table__num">{row.completionPct}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </DataTable>
+        ) : (
+          <tr>
+            <th style={{ width: 88 }}>Rank</th>
+            <th>Name</th>
+            <th className="table__num">Points</th>
+            <th className="table__num">Total time</th>
+            <th className="table__num">Failed attempts</th>
+          </tr>
+        )}
+      </thead>
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={row.uid}>
+            <td>
+              <Rank rank={row.rank} tied={isTied(rows, index)} />
+            </td>
+            <td className="table__primary">{row.studentName || '(unnamed)'}</td>
+            {board === 'time' ? (
+              <>
+                <td className="table__num">
+                  <strong>{row.avgTimeSec == null ? dash : formatAverageTime(row.avgTimeSec)}</strong>
+                </td>
+                <td className="table__num">{row.totalPoints}</td>
+              </>
+            ) : (
+              <>
+                <td className="table__num">
+                  <strong>{row.totalPoints}</strong>
+                </td>
+                <td className="table__num">{formatDuration(row.totalTimeSec)}</td>
+              </>
+            )}
+            <td className="table__num">{failed(row)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </DataTable>
   );
 }

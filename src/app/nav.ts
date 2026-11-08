@@ -42,7 +42,7 @@ export const NAV: NavItem[] = [
     label: 'Leaderboard',
     icon: '🏆',
     title: 'Leaderboard',
-    subtitle: 'Guests, and the top 10 of every class',
+    subtitle: 'Quiz ranked by points, jigsaw by time — guests, and the top 10 of every class',
     section: 'Manage',
     roles: ['admin'],
   },

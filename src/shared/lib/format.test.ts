@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanSection, gradeSection, sectionNote } from './format';
+import { cleanSection, formatAverageTime, gradeSection, sectionNote } from './format';
 
 describe('cleanSection', () => {
   it('keeps letters and digits', () => {
@@ -27,5 +27,17 @@ describe('sectionNote', () => {
     expect(sectionNote('Infinity1')).toBeUndefined();
     expect(sectionNote(null)).toBeUndefined();
     expect(sectionNote('St. Rizal')).toContain('St. Rizal');
+  });
+});
+
+describe('formatAverageTime', () => {
+  it('keeps one decimal under a minute', () => {
+    expect(formatAverageTime(10)).toBe('10.0 s');
+    expect(formatAverageTime(20.25)).toBe('20.3 s');
+  });
+  it('falls back to mm:ss and a dash', () => {
+    expect(formatAverageTime(75)).toBe('01:15');
+    expect(formatAverageTime(null)).toBe('—');
+    expect(formatAverageTime(undefined)).toBe('—');
   });
 });

@@ -285,9 +285,23 @@ export function Empty({
   );
 }
 
-/** 1st/2nd/3rd get the medal colours the game already uses. */
-export function Rank({ rank }: { rank: number }) {
-  return <span className={`rank ${rank <= 3 ? `rank--${rank}` : ''}`}>{rank}</span>;
+/**
+ * 1st/2nd/3rd get the medal colours the game already uses. `tied` marks a rank
+ * the server gave to more than one player (1, 1, 3) — shown as given, never
+ * renumbered here.
+ */
+export function Rank({ rank, tied }: { rank: number; tied?: boolean }) {
+  return (
+    <span className="rank-cell">
+      <span
+        className={`rank ${rank <= 3 ? `rank--${rank}` : ''}`}
+        title={tied ? `Tied for ${rank}` : undefined}
+      >
+        {rank}
+      </span>
+      {tied && <span className="rank__tie">tied</span>}
+    </span>
+  );
 }
 
 /* ---------------------------------------------------------- confirm dialog */

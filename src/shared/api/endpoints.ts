@@ -5,6 +5,7 @@ import type {
   ApiCategory,
   ApiCategoryKey,
   ApiClass,
+  ApiClassProgression,
   ApiClassMember,
   ApiContentSettings,
   ApiCurrentUser,
@@ -12,6 +13,7 @@ import type {
   ApiJigsawItem,
   ApiJigsawPieceCount,
   ApiLeaderboard,
+  ApiLeaderboardBoard,
   ApiPack,
   ApiQuestion,
   ApiSession,
@@ -315,17 +317,32 @@ export const packsApi = {
 /* --------------------------------------------------------------- analytics */
 
 export const analyticsApi = {
+  /**
+   * `board` picks the ranking; left out, the API follows the activity type
+   * (jigsaw → time, otherwise points). An API from before the ranking change
+   * ignores it and ranks by points.
+   */
   leaderboard(
     classId: string,
     filter: AnalyticsFilter = {},
     limit = 10,
+    board?: ApiLeaderboardBoard,
   ): Promise<ApiLeaderboard> {
-    return request('/analytics/leaderboard', { query: { classId, ...filter, limit } });
+    return request('/analytics/leaderboard', { query: { classId, ...filter, board, limit } });
   },
 
   /** Registered students with no class — juanwise-be `GET /analytics/leaderboard/guests`. */
-  guestLeaderboard(filter: AnalyticsFilter = {}, limit = 50): Promise<ApiGuestLeaderboard> {
-    return request('/analytics/leaderboard/guests', { query: { ...filter, limit } });
+  guestLeaderboard(
+    filter: AnalyticsFilter = {},
+    limit = 50,
+    board?: ApiLeaderboardBoard,
+  ): Promise<ApiGuestLeaderboard> {
+    return request('/analytics/leaderboard/guests', { query: { ...filter, board, limit } });
+  },
+
+  /** One row per active roster member, including those who have not started. Teacher only. */
+  progression(classId: string, filter: AnalyticsFilter = {}): Promise<ApiClassProgression> {
+    return request('/analytics/progression', { query: { classId, ...filter } });
   },
 };
 

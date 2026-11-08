@@ -703,6 +703,21 @@ textarea {
   color: var(--muted);
 }
 
+.rank-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rank__tie {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .rank--1 {
   background: var(--gold);
   border-color: transparent;
@@ -719,6 +734,23 @@ textarea {
   background: #f0d5b8;
   border-color: transparent;
   color: #6b4420;
+}
+
+/* A one-line "How ranking works" note under a leaderboard. */
+.ranking-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--blue-tint);
+  color: var(--blue-dark);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+
+.ranking-note strong {
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------- states */
@@ -1779,4 +1811,9 @@ textarea {
   .dialog {
     padding: 18px;
   }
+}
+
+.card > .ranking-note:last-child {
+  border-bottom: 0;
+  border-radius: inherit;
 }
