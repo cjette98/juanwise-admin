@@ -31,11 +31,40 @@
   --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
   --sidebar-width: 248px;
 
+  /*
+   * The game's type system (juanwise-app-v2 `shared/theme/tokens.ts`, item 3 of
+   * Adjustment 3): Baloo 2 for headings and buttons, Nunito for body copy and
+   * labels, at the app's sizes. The client asked for one font and one scale
+   * "from the first screen to the last", on the phone and on this console.
+   */
+  --font-display: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  /* size / line-height pairs, named after the app's text variants */
+  --type-display: 34px;
+  --type-display-lh: 38px;
+  --type-h1: 24px;
+  --type-h1-lh: 28px;
+  --type-h2: 19px;
+  --type-h2-lh: 23px;
+  --type-h3: 17px;
+  --type-h3-lh: 21px;
+  --type-body: 15px;
+  --type-body-lh: 23px;
+  --type-body-strong: 16.5px;
+  --type-label: 12px;
+  --type-label-lh: 16px;
+  --type-caption: 12.5px;
+  --type-caption-lh: 17px;
+
+  --page-pad-x: 28px;
+  --page-pad-y: 24px;
+
   color-scheme: light;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
   color: var(--ink);
 }
 
@@ -60,18 +89,29 @@ h2,
 h3,
 h4 {
   margin: 0;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
   font-weight: 700;
+  letter-spacing: 0;
 }
 
 h1 {
-  font-size: 24px;
+  font-size: var(--type-h1);
+  line-height: var(--type-h1-lh);
+  font-weight: 800;
 }
 h2 {
-  font-size: 18px;
+  font-size: var(--type-h2);
+  line-height: var(--type-h2-lh);
 }
-h3 {
-  font-size: 15px;
+h3,
+h4 {
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
+}
+
+strong,
+b {
+  font-weight: 800;
 }
 
 p {
@@ -127,7 +167,8 @@ textarea {
 }
 
 .sidebar__title {
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
   font-weight: 800;
   line-height: 1.15;
 }
@@ -141,12 +182,13 @@ textarea {
 }
 
 .sidebar__section {
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 15px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: rgba(255, 255, 255, 0.55);
   padding: 16px 10px 6px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .navlink {
@@ -157,8 +199,8 @@ textarea {
   border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.82);
   text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--type-body);
+  font-weight: 700;
 }
 
 .navlink:hover {
@@ -214,7 +256,8 @@ textarea {
 
 .topbar__subtitle {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   margin-top: 2px;
 }
 
@@ -255,7 +298,8 @@ textarea {
 
 .card__hint {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   margin-top: 2px;
 }
 
@@ -303,22 +347,24 @@ textarea {
 }
 
 .stat__label {
-  font-size: 12px;
+  font-size: var(--type-label);
+  line-height: var(--type-label-lh);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .stat__value {
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-size: var(--type-display);
+  line-height: var(--type-display-lh);
   font-weight: 800;
-  letter-spacing: -0.03em;
   margin-top: 6px;
 }
 
 .stat__hint {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--muted);
   margin-top: 2px;
 }
@@ -330,9 +376,11 @@ textarea {
   gap: 7px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 7px 14px;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  line-height: 22px;
+  font-weight: 700;
   cursor: pointer;
   background: var(--blue);
   color: #fff;
@@ -377,8 +425,9 @@ textarea {
 }
 
 .btn--sm {
-  padding: 5px 10px;
-  font-size: 13px;
+  padding: 4px 10px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .btn--block {
@@ -391,17 +440,18 @@ textarea {
 }
 
 .field__label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 800;
 }
 
 .field__hint {
-  font-size: 12px;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
   color: var(--muted);
 }
 
 .field__error {
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--red);
   font-weight: 600;
 }
@@ -551,11 +601,12 @@ textarea {
 
 .table th {
   text-align: left;
-  font-size: 12px;
+  font-size: var(--type-label);
+  line-height: var(--type-label-lh);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.09em;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--canvas);
@@ -577,12 +628,12 @@ textarea {
 }
 
 .table__primary {
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .table__sub {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--type-caption);
 }
 
 .table__num {
@@ -635,6 +686,9 @@ textarea {
 }
 
 .empty__title {
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
   font-weight: 700;
   color: var(--ink);
   margin-top: 8px;
@@ -716,11 +770,11 @@ textarea {
 }
 
 .login__headline {
-  font-size: 32px;
+  font-family: var(--font-display);
+  font-size: var(--type-display);
   font-weight: 800;
-  letter-spacing: -0.03em;
   max-width: 15ch;
-  line-height: 1.15;
+  line-height: var(--type-display-lh);
 }
 
 .login__blurb {
@@ -782,7 +836,8 @@ textarea {
 }
 
 .jigsaw-overview h2 {
-  font-size: 22px;
+  font-size: var(--type-h1);
+  line-height: var(--type-h1-lh);
 }
 
 .jigsaw-overview p {
@@ -1299,8 +1354,10 @@ textarea {
   background: transparent;
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 700;
   color: var(--muted);
   cursor: pointer;
 }
@@ -1336,8 +1393,9 @@ textarea {
 
 .dialog__title {
   margin: 0 0 10px;
-  font-size: 17px;
-  font-weight: 650;
+  font-size: var(--type-h2);
+  line-height: var(--type-h2-lh);
+  font-weight: 700;
 }
 
 .dialog__body {
@@ -1386,8 +1444,10 @@ textarea {
 .quiz-section__legend {
   margin: 0 0 4px;
   padding: 0;
-  font-size: 13px;
-  font-weight: 650;
+  font-family: var(--font-display);
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
+  font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--ink);
 }
@@ -1455,7 +1515,7 @@ textarea {
 
 .quiz-type__name {
   grid-area: name;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .quiz-type__desc {
