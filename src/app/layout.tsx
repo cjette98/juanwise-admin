@@ -25,7 +25,13 @@ export default function AdminLayout() {
       if (event.key === 'Escape') setDrawerOpen(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // The page behind an open drawer should not scroll under the finger.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [drawerOpen]);
 
   const visibleNav = NAV.filter(

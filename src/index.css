@@ -697,6 +697,11 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+/* `.table th` would otherwise pull numeric headers left of their numbers. */
+.table th.table__num {
+  text-align: right;
+}
+
 .rank {
   width: 26px;
   height: 26px;
@@ -1848,6 +1853,16 @@ textarea {
 
   .pill-tabs {
     max-width: 100%;
+  }
+
+  /* Two stats to a row rather than one tall column of them. */
+  .grid--stats {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+  }
+
+  .stat {
+    padding: 12px 14px;
   }
 
   .dialog {
