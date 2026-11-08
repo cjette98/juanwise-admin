@@ -113,6 +113,15 @@ export interface ApiClass {
   updatedAt: string | null;
 }
 
+/** `POST /classes` — juanwise-be `createClassSchema`. The code is generated when omitted. */
+export interface CreateClassRequest {
+  name: string;
+  /** "1"–"12". */
+  gradeLevel?: string;
+  /** Letters and digits only, at most 40. */
+  section?: string;
+}
+
 export interface ApiClassMember {
   uid: string;
   name: string;

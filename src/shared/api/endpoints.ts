@@ -19,6 +19,7 @@ import type {
   ApiSession,
   ApiUserProfile,
   AssignPackRequest,
+  CreateClassRequest,
   JigsawItemInput,
   ListUsersQuery,
   LoginRequest,
@@ -123,6 +124,21 @@ export const classesApi = {
 
   mine(): Promise<ApiClass[]> {
     return request<{ items: ApiClass[] }>('/classes/mine').then((r) => r.items);
+  },
+
+  /**
+   * The same `POST /classes` the app uses, so a class made here is the one the
+   * app shows (item 4 of Adjustment 3). Teacher only.
+   */
+  create(input: CreateClassRequest): Promise<ApiClass> {
+    return request('/classes', { method: 'POST', body: input });
+  },
+
+  /** A soft removal: the student leaves the roster, their past results stay theirs. */
+  removeMember(id: string, uid: string): Promise<void> {
+    return request(`/classes/${encodeURIComponent(id)}/members/${encodeURIComponent(uid)}`, {
+      method: 'DELETE',
+    });
   },
 
   /** Inactive classes only: an empty roster and no recorded results. */

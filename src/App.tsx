@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AdminLayout from '@/app/layout';
 import { AuthProvider, useAuth } from '@/features/auth/auth-context';
 import LoginScreen from '@/features/auth/login-screen';
+import ClassOverviewScreen from '@/features/classes/class-overview-screen';
 import MyClassesScreen from '@/features/classes/my-classes-screen';
 import DashboardScreen from '@/features/dashboard/dashboard-screen';
 import JigsawScreen from '@/features/jigsaw/jigsaw-screen';
@@ -76,6 +77,14 @@ function Gate() {
           element={
             <RequireRole role="teacher">
               <MyClassesScreen />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/my-classes/:classId"
+          element={
+            <RequireRole role="teacher">
+              <ClassOverviewScreen />
             </RequireRole>
           }
         />

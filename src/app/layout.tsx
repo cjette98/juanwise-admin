@@ -28,7 +28,9 @@ export default function AdminLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
 
-  const visibleNav = NAV.filter((item) => user && item.roles.includes(user.role as 'admin' | 'teacher'));
+  const visibleNav = NAV.filter(
+    (item) => !item.hidden && user && item.roles.includes(user.role as 'admin' | 'teacher'),
+  );
   const sections = ['Manage', 'Content'] as const;
 
   const handleSignOut = async () => {

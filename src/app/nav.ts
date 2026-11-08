@@ -7,6 +7,8 @@ export interface NavItem {
   subtitle: string;
   section: 'Manage' | 'Content';
   roles: ('admin' | 'teacher')[];
+  /** A page with a top-bar title but no sidebar link of its own. */
+  hidden?: boolean;
 }
 
 export const NAV: NavItem[] = [
@@ -54,6 +56,17 @@ export const NAV: NavItem[] = [
     subtitle: 'Build, duplicate and publish the activities your classes play',
     section: 'Content',
     roles: ['admin', 'teacher'],
+  },
+  {
+    // Before `/my-classes` so `navForPath` finds it first.
+    path: '/my-classes/',
+    label: 'Class Overview',
+    icon: '🏫',
+    title: 'Class Overview',
+    subtitle: 'The roster, and how far each student has got',
+    section: 'Manage',
+    roles: ['teacher'],
+    hidden: true,
   },
   {
     path: '/my-classes',

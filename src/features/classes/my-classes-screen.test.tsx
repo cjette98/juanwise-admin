@@ -9,6 +9,7 @@ const assignPack = vi.fn();
 const clearPack = vi.fn();
 const list = vi.fn();
 const publish = vi.fn();
+const create = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -16,6 +17,7 @@ vi.mock('@/shared/api', async (importOriginal) => ({
     mine: (...args: unknown[]) => mine(...args),
     assignPack: (...args: unknown[]) => assignPack(...args),
     clearPack: (...args: unknown[]) => clearPack(...args),
+    create: (...args: unknown[]) => create(...args),
   },
   packsApi: {
     list: (...args: unknown[]) => list(...args),
@@ -257,5 +259,48 @@ describe('my classes', () => {
     await user.click(screen.getByRole('button', { name: 'Clear' }));
 
     await waitFor(() => expect(clearPack).toHaveBeenCalledWith('class-1'));
+  });
+});
+
+describe('create class', () => {
+  it('creates a class with POST /classes and shows its code', async () => {
+    const { user } = await renderScreen({ classes: [], packs: [] });
+    create.mockResolvedValue(klass({ id: 'class-9', name: 'Grade 5 - Rizal', code: 'NEWCODE123' }));
+    mine.mockResolvedValue([klass({ id: 'class-9', name: 'Grade 5 - Rizal', code: 'NEWCODE123' })]);
+
+    await user.click(screen.getByRole('button', { name: 'Create class' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Class name'), '  Grade 5 - Rizal ');
+    await user.selectOptions(within(dialog).getByLabelText('Grade (optional)'), '5');
+    await user.type(within(dialog).getByLabelText('Section (optional)'), 'Rizal');
+    await user.click(within(dialog).getByRole('button', { name: 'Create class' }));
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({ name: 'Grade 5 - Rizal', gradeLevel: '5', section: 'Rizal' }),
+    );
+    expect(await screen.findByText(/Students join with the code/)).toBeInTheDocument();
+    expect(screen.getAllByText('NEWCODE123').length).toBeGreaterThan(0);
+    expect(mine).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses an empty name and a section with punctuation before calling the API', async () => {
+    const { user } = await renderScreen({ classes: [], packs: [] });
+
+    await user.click(screen.getByRole('button', { name: 'Create class' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Section (optional)'), 'A-1');
+    await user.click(within(dialog).getByRole('button', { name: 'Create class' }));
+
+    expect(within(dialog).getByText('Give the class a name.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Use letters and numbers only.')).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('links each class to its overview', async () => {
+    await renderScreen();
+    expect(screen.getByRole('link', { name: 'Grade 6 - Mabini' })).toHaveAttribute(
+      'href',
+      '/my-classes/class-1',
+    );
   });
 });
