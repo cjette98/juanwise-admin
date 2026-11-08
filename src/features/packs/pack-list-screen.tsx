@@ -1,10 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { errorMessage, packsApi, type ApiPack, type ApiPackStatus } from '@/shared/api';
+import {
+  errorMessage,
+  packsApi,
+  type ApiPack,
+  type ApiPackStatus,
+  type PatchPackRequest,
+} from '@/shared/api';
 import { Badge, Banner, Button, Card, ConfirmDialog, DataTable, Empty, Field, Input, Loading } from '@/shared/components/ui';
 import { useAsync } from '@/shared/lib/use-async';
 import { matchesSearch } from '@/shared/lib/format';
 import { useAuth } from '@/features/auth/auth-context';
+import { EditPackDialog } from './edit-pack-dialog';
 
 const STATUS_TONE: Record<ApiPackStatus, 'default' | 'green' | 'red'> = {
   draft: 'default',
@@ -36,6 +43,7 @@ export default function PackListScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [newPackOpen, setNewPackOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ApiPack | null>(null);
+  const [editing, setEditing] = useState<ApiPack | null>(null);
 
   const rows = useMemo(
     () => (packs ?? []).filter((pack) => matchesSearch(search, pack.name)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -74,6 +82,11 @@ export default function PackListScreen() {
     } finally {
       setBusyKey(null);
     }
+  };
+
+  const savePack = async (id: string, patch: PatchPackRequest) => {
+    await packsApi.patch(id, patch);
+    reload();
   };
 
   const createPack = async (name: string) => {
@@ -156,6 +169,7 @@ export default function PackListScreen() {
                       <div className="table__primary">{pack.name}</div>
                       <div className="table__sub">
                         {pack.origin === 'system' ? 'Built-in starter set' : owned ? 'Yours' : 'By another teacher'}
+                        {!pack.showMiniLesson && ' · mini-lessons off'}
                       </div>
                     </td>
                     <td>
@@ -171,6 +185,9 @@ export default function PackListScreen() {
                       <div className="row">
                         {owned && (
                           <>
+                            <Button variant="secondary" small onClick={() => setEditing(pack)}>
+                              Edit
+                            </Button>
                             <Link to={`/packs/${pack.id}/quiz`}>
                               <Button variant="secondary" small>
                                 Edit quiz
@@ -227,6 +244,8 @@ export default function PackListScreen() {
             </tbody>
           </DataTable>
       )}
+
+      <EditPackDialog pack={editing} onClose={() => setEditing(null)} onSave={savePack} />
 
       <NewPackDialog open={newPackOpen} onClose={() => setNewPackOpen(false)} onCreate={createPack} />
 

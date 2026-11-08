@@ -765,7 +765,17 @@ function SlotEditor({
 
 /* ---------------------------------------------------------------- fallback */
 
-function CategoryFallback({
+/**
+ * The category's own mini-lesson and picture (item 10 of Adjustment 3: "one
+ * mini-lesson per category with an optional picture"). The game shows them on
+ * the category's mini-lesson card, and plays the picture for any jigsaw
+ * activity with no picture of its own — so it goes through the same square
+ * cropper as an activity picture.
+ *
+ * `context_en`, `context_tl` and `imageUrl` are juanwise-be's category fields;
+ * the picture is a `category-image` upload. Text and picture save together.
+ */
+export function CategoryFallback({
   packId,
   category,
   onSaved,
@@ -774,19 +784,70 @@ function CategoryFallback({
   category: ApiCategory;
   onSaved: () => void;
 }) {
-  const [context, setContext] = useState(category.context_tl ?? '');
+  const [contextEn, setContextEn] = useState(category.context_en ?? '');
+  const [contextTl, setContextTl] = useState(category.context_tl ?? '');
+  /** The picture as picked, waiting for its crop. */
+  const [pending, setPending] = useState<File | null>(null);
+  /** The cropped square, waiting for Save. */
+  const [square, setSquare] = useState<File | null>(null);
+  const [squareUrl, setSquareUrl] = useState<string | null>(null);
+  const [removePicture, setRemovePicture] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setContext(category.context_tl ?? ''), [category]);
+  useEffect(() => {
+    setContextEn(category.context_en ?? '');
+    setContextTl(category.context_tl ?? '');
+    setSquare(null);
+    setRemovePicture(false);
+  }, [category]);
+
+  useEffect(() => {
+    if (!square) {
+      setSquareUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(square);
+    setSquareUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [square]);
+
+  const pickFile = (file: File | undefined) => {
+    if (fileInput.current) fileInput.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file (JPG, PNG or WebP).');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError('That image is larger than 5 MB. Choose a smaller one.');
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    setPending(file);
+  };
 
   const save = async () => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await contentApi.updateCategory(packId, category.key, { context_tl: context.trim() || null });
+      let imageUrl: string | null | undefined;
+      if (square) {
+        imageUrl = await mediaApi.upload(square, 'category-image', { categoryKey: category.key });
+      } else if (removePicture) {
+        imageUrl = null;
+      }
+      await contentApi.updateCategory(packId, category.key, {
+        context_en: contextEn.trim() || null,
+        context_tl: contextTl.trim() || null,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
+      });
+      setSquare(null);
+      setRemovePicture(false);
       setNotice('Saved.');
       onSaved();
     } catch (err) {
@@ -796,40 +857,94 @@ function CategoryFallback({
     }
   };
 
+  const shownPicture = squareUrl ?? (removePicture ? null : category.imageUrl);
+
   return (
     <Card
-      title="Category fallback"
-      hint="Used by the mini-lesson list, and by any activity with no picture of its own"
+      title="Category mini-lesson"
+      hint="Shown on the category's mini-lesson card. The picture also plays in any jigsaw activity with no picture of its own."
       actions={
-        <Button variant="secondary" small onClick={save} busy={busy}>
+        <Button small onClick={save} busy={busy} disabled={!!pending}>
           Save
         </Button>
       }
     >
-      <div className="grid grid--2">
-        <div>
-          <div className="field__label" style={{ marginBottom: 6 }}>
-            Picture
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        aria-label="Category picture file"
+        onChange={(e) => pickFile(e.target.files?.[0])}
+      />
+
+      {pending ? (
+        <JigsawCropper
+          file={pending}
+          onCancel={() => setPending(null)}
+          onConfirm={(cropped) => {
+            setSquare(cropped);
+            setRemovePicture(false);
+            setPending(null);
+          }}
+        />
+      ) : (
+        <div className="grid grid--2">
+          <div className="grid" style={{ gap: 8, alignContent: 'start' }}>
+            <div className="field__label">Picture (optional)</div>
+            <img
+              src={shownPicture ?? fallbackJigsawImage[category.key]}
+              alt=""
+              className="thumb"
+              style={{ maxWidth: 200 }}
+            />
+            <div className="field__hint">
+              {square ? (
+                <Badge tone="blue">New picture — not saved yet</Badge>
+              ) : shownPicture ? (
+                <Badge tone="green">Uploaded</Badge>
+              ) : (
+                <Badge>The image the game ships with</Badge>
+              )}
+            </div>
+            <div className="row">
+              <Button variant="secondary" small onClick={() => fileInput.current?.click()} disabled={busy}>
+                {shownPicture ? 'Replace picture' : 'Upload picture'}
+              </Button>
+              {(square || (category.imageUrl && !removePicture)) && (
+                <Button
+                  variant="ghost"
+                  small
+                  disabled={busy}
+                  onClick={() => {
+                    if (square) setSquare(null);
+                    else setRemovePicture(true);
+                  }}
+                >
+                  {square ? 'Undo' : 'Use the built-in image'}
+                </Button>
+              )}
+            </div>
           </div>
-          <img
-            src={category.imageUrl ?? fallbackJigsawImage[category.key]}
-            alt=""
-            className="thumb"
-            style={{ maxWidth: 200 }}
-          />
-          <div className="field__hint" style={{ marginTop: 6 }}>
-            {category.imageUrl ? (
-              <Badge tone="green">Uploaded</Badge>
-            ) : (
-              <Badge>The image the game ships with</Badge>
-            )}
+
+          <div className="grid" style={{ gap: 12, alignContent: 'start' }}>
+            <Field label="Mini-lesson — English">
+              <Textarea
+                value={contextEn}
+                onChange={(e) => setContextEn(e.target.value)}
+                maxLength={4000}
+              />
+            </Field>
+            <Field label="Mini-lesson — Tagalog">
+              <Textarea
+                value={contextTl}
+                onChange={(e) => setContextTl(e.target.value)}
+                maxLength={4000}
+              />
+            </Field>
           </div>
         </div>
-
-        <Field label="Mini-lesson — Tagalog" hint="Shown on the category's mini-lesson card.">
-          <Textarea value={context} onChange={(e) => setContext(e.target.value)} maxLength={4000} />
-        </Field>
-      </div>
+      )}
 
       {error && <Banner tone="error">{error}</Banner>}
       {notice && !error && <Banner tone="success">{notice}</Banner>}

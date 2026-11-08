@@ -10,6 +10,7 @@ const duplicate = vi.fn();
 const publish = vi.fn();
 const archive = vi.fn();
 const remove = vi.fn();
+const patch = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -20,6 +21,7 @@ vi.mock('@/shared/api', async (importOriginal) => ({
     publish: (...args: unknown[]) => publish(...args),
     archive: (...args: unknown[]) => archive(...args),
     remove: (...args: unknown[]) => remove(...args),
+    patch: (...args: unknown[]) => patch(...args),
   },
   errorMessage: (err: unknown, fallback = 'error') =>
     err instanceof Error ? err.message : fallback,
@@ -206,5 +208,54 @@ describe('deleting a pack', () => {
 
     expect(await screen.findByText('A class still uses this pack.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveAttribute('open');
+  });
+});
+
+describe('pack edit dialog', () => {
+  it('renames a pack and turns its mini-lessons off with one PATCH', async () => {
+    const { user } = await renderScreen([pack({ id: 'pack-1', name: 'Grade 6 – Q1', showMiniLesson: true })]);
+    patch.mockResolvedValue(pack({ name: 'Grade 6 – Quarter 1', showMiniLesson: false }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog');
+    const name = within(dialog).getByLabelText('Pack name');
+    await user.clear(name);
+    await user.type(name, 'Grade 6 – Quarter 1');
+    await user.click(within(dialog).getByRole('checkbox', { name: /Show mini-lessons/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(patch).toHaveBeenCalledWith('pack-1', { name: 'Grade 6 – Quarter 1', showMiniLesson: false }),
+    );
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends only the field that changed', async () => {
+    const { user } = await renderScreen([pack({ id: 'pack-1', showMiniLesson: false })]);
+    patch.mockResolvedValue(pack({ showMiniLesson: true }));
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: /Show mini-lessons/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('pack-1', { showMiniLesson: true }));
+  });
+
+  it('refuses an empty name', async () => {
+    const { user } = await renderScreen();
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Pack name'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(within(dialog).getByText('Give the pack a name.')).toBeInTheDocument();
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('is not offered on a pack the teacher does not own', async () => {
+    await renderScreen([pack({ ownerUid: 'someone-else', status: 'published' })]);
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 });

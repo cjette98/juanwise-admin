@@ -1929,3 +1929,29 @@ textarea {
   margin-left: auto;
   font-weight: 800;
 }
+
+/* A checkbox with a label and a hint beside it. */
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: 0 0 18px;
+  accent-color: var(--blue);
+}
+
+.check > span {
+  display: grid;
+  gap: 2px;
+}
+
+.check__label {
+  font-weight: 800;
+}
