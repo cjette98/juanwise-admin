@@ -190,8 +190,8 @@ export default function DashboardScreen() {
         }}
       >
         <p>
-          Nobody has joined it, so nothing is lost — the code {pendingDelete?.code} becomes
-          available again. A class with a roster or recorded results cannot be deleted.
+          No student is on its roster, so nothing is lost — the code {pendingDelete?.code} becomes
+          available again. A class with students or recorded results cannot be deleted.
         </p>
         {actionError && <Banner tone="error">{actionError}</Banner>}
       </ConfirmDialog>

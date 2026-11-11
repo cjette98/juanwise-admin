@@ -10,6 +10,7 @@ const clearPack = vi.fn();
 const list = vi.fn();
 const publish = vi.fn();
 const create = vi.fn();
+const remove = vi.fn();
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/api')>()),
@@ -18,6 +19,7 @@ vi.mock('@/shared/api', async (importOriginal) => ({
     assignPack: (...args: unknown[]) => assignPack(...args),
     clearPack: (...args: unknown[]) => clearPack(...args),
     create: (...args: unknown[]) => create(...args),
+    remove: (...args: unknown[]) => remove(...args),
   },
   packsApi: {
     list: (...args: unknown[]) => list(...args),
@@ -302,5 +304,35 @@ describe('create class', () => {
       'href',
       '/my-classes/class-1',
     );
+  });
+});
+
+describe('deleting a class (Correction 1, N2)', () => {
+  it('offers Delete only on a class with no students, and deletes it after confirming', async () => {
+    remove.mockResolvedValue(undefined);
+    const { user } = await renderScreen({
+      classes: [klass(), klass({ id: 'class-2', name: 'Grade 6 - Old', code: 'OLD1234567', memberCount: 0 })],
+    });
+
+    const rows = screen.getAllByRole('row');
+    const full = rows.find((r) => within(r).queryByText('Grade 6 - Mabini'))!;
+    const empty = rows.find((r) => within(r).queryByText('Grade 6 - Old'))!;
+    expect(within(full).queryByRole('button', { name: 'Delete' })).toBeNull();
+
+    await user.click(within(empty).getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete the class' }));
+
+    expect(remove).toHaveBeenCalledWith('class-2');
+    expect(await screen.findByText(/Grade 6 - Old was deleted and the code OLD1234567 is free again/)).toBeInTheDocument();
+  });
+
+  it("shows the API's reason when the class cannot be deleted", async () => {
+    remove.mockRejectedValue(new Error('This class has recorded results, so it cannot be deleted.'));
+    const { user } = await renderScreen({ classes: [klass({ memberCount: 0 })] });
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete the class' }));
+
+    expect(await screen.findByText('This class has recorded results, so it cannot be deleted.')).toBeInTheDocument();
   });
 });
