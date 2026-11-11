@@ -632,7 +632,7 @@ function QuestionEditor({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '20px 16px', borderRadius: 10, textAlign: 'center',
                 border: '1px dashed var(--line, #d9d9d9)', color: 'var(--muted, #767676)',
-                fontSize: 13,
+                fontSize: 'var(--type-caption)',
               }}
             >
               No picture — the category picture is used instead.
